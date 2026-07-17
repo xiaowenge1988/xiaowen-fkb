@@ -4,7 +4,7 @@
 
 /* ========== Config ========== */
 var AREAS=['临平','余杭','萧山','拱墅','西湖','上城','滨江','钱塘','富阳','临安'];
-var SK_C='xwg_fkb_clients_v6', SK_P='xwg_fkb_props_v6', SK_T='xwg_fkb_tx_v6', SK_AUTH='xwg_fkb_auth_v6';
+var SK_C='xwg_fkb_clients_v6', SK_P='xwg_fkb_props_v6', SK_T='xwg_fkb_tx_v6', SK_AUTH='xwg_fkb_auth_v6', SK_USER='xwg_fkb_user_v6';
 
 /* ========== State ========== */
 var S={
@@ -95,6 +95,7 @@ function doSetup(username,password,name,phone){
 
 function doLogout(){
   localStorage.removeItem(SK_AUTH);
+  localStorage.removeItem(SK_USER);
   localStorage.removeItem(SK_C);localStorage.removeItem(SK_P);localStorage.removeItem(SK_T);
   S.currentUser=null;S.clients=[];S.properties=[];S.transactions=[];S.allUsers=[];
   showLoginScreen();
@@ -151,7 +152,7 @@ function tryAuth(){
     errEl.textContent='正在创建管理员账号…';
     doSetup(username,pw,name,phone).then(function(d){
       if(d.ok){
-        localStorage.setItem(SK_AUTH,d.token);
+        localStorage.setItem(SK_AUTH,d.token);localStorage.setItem(SK_USER,JSON.stringify(d.user));
         S.currentUser=d.user;
         hideLoginScreen();
         toast('管理员账号创建成功','success');
@@ -164,7 +165,7 @@ function tryAuth(){
     errEl.textContent='正在登录…';
     doLogin(username,pw).then(function(d){
       if(d.ok){
-        localStorage.setItem(SK_AUTH,d.token);
+        localStorage.setItem(SK_AUTH,d.token);localStorage.setItem(SK_USER,JSON.stringify(d.user));
         S.currentUser=d.user;
         hideLoginScreen();
         toast('登录成功，欢迎回来，'+d.user.name,'success');
@@ -1903,12 +1904,29 @@ function init(){
         renderClientList();
       });
     }else{
-      // token无效或服务器不可用
-      localStorage.removeItem(SK_AUTH);
-      MediaDB.init().then(function(){
-        setupHandlers();
-        showLoginScreen();
-      });
+      // 服务器不可用或token已被doLogout清除
+      var stillHasToken=localStorage.getItem(SK_AUTH);
+      if(stillHasToken){
+        // 服务器不可达但token还在（网络波动），用本地缓存继续使用
+        console.log('[初始化] 服务器不可达，使用本地缓存+已保存的登录状态');
+        var savedUser=localStorage.getItem(SK_USER);
+        if(savedUser){try{S.currentUser=JSON.parse(savedUser)}catch(e){S.currentUser={id:'admin',name:'管理员',role:'admin'}}}
+        else{S.currentUser={id:'admin',name:'管理员',role:'admin'}}
+        loadC();loadP();loadT();
+        MediaDB.init().then(function(){
+          setupHandlers();
+          checkReminders();
+          setInterval(checkReminders,300000);
+          updateRoleUI();
+          renderClientList();
+        });
+      }else{
+        // token已被doLogout清除（服务器返回了401），需要重新登录
+        MediaDB.init().then(function(){
+          setupHandlers();
+          showLoginScreen();
+        });
+      }
     }
   });
 }
