@@ -1814,7 +1814,8 @@ function getSampleTransactions(){
 function initAfterLogin(){
   // 登录成功后从服务器加载数据
   loadFromServer().then(function(serverData){
-    if(serverData&&serverData.clients){
+    var serverEmpty=(serverData&&serverData.clients&&serverData.clients.length===0&&serverData.properties&&serverData.properties.length===0);
+    if(serverData&&serverData.clients&&(serverData.clients.length>0||serverData.properties&&serverData.properties.length>0)){
       S.clients=serverData.clients.map(migrateClient);
       S.properties=serverData.properties||[];
       S.transactions=serverData.transactions||[];
@@ -1823,6 +1824,18 @@ function initAfterLogin(){
       localStorage.setItem(SK_T,JSON.stringify(S.transactions));
       if(serverData.allUsers)S.allUsers=serverData.allUsers;
       console.log('[初始化] 已从云端加载:',S.clients.length,'客户,',S.properties.length,'房源');
+    }else if(serverEmpty){
+      // 服务器数据为空 — 可能是云平台重启后数据丢失
+      // 从本地缓存恢复数据，然后自动上传到服务器
+      loadC();loadP();loadT();
+      if(S.clients.length>0||S.properties.length>0||S.transactions.length>0){
+        console.log('[初始化] 服务器数据为空，从本地恢复并上传:',S.clients.length,'客户,',S.properties.length,'房源');
+        if(serverData.allUsers)S.allUsers=serverData.allUsers;
+        setTimeout(function(){syncToServer();toast('已从本地恢复数据到云端','success')},1000);
+      }else{
+        if(serverData.allUsers)S.allUsers=serverData.allUsers;
+        console.log('[初始化] 服务器和本地均为空');
+      }
     }else{
       // 服务器不可用，从本地加载
       loadC();loadP();loadT();
@@ -1852,12 +1865,22 @@ function init(){
   loadFromServer().then(function(serverData){
     if(serverData&&serverData.clients){
       // token有效
-      S.clients=serverData.clients.map(migrateClient);
-      S.properties=serverData.properties||[];
-      S.transactions=serverData.transactions||[];
-      localStorage.setItem(SK_C,JSON.stringify(S.clients));
-      localStorage.setItem(SK_P,JSON.stringify(S.properties));
-      localStorage.setItem(SK_T,JSON.stringify(S.transactions));
+      var serverEmpty=(serverData.clients.length===0&&(serverData.properties||[]).length===0);
+      if(serverEmpty){
+        // 服务器数据为空 — 可能是云平台重启后数据丢失，从本地恢复
+        loadC();loadP();loadT();
+        if(S.clients.length>0||S.properties.length>0||S.transactions.length>0){
+          console.log('[初始化] 服务器数据为空，从本地恢复并上传');
+          setTimeout(function(){syncToServer()},1500);
+        }
+      }else{
+        S.clients=serverData.clients.map(migrateClient);
+        S.properties=serverData.properties||[];
+        S.transactions=serverData.transactions||[];
+        localStorage.setItem(SK_C,JSON.stringify(S.clients));
+        localStorage.setItem(SK_P,JSON.stringify(S.properties));
+        localStorage.setItem(SK_T,JSON.stringify(S.transactions));
+      }
       if(serverData.allUsers)S.allUsers=serverData.allUsers;
       // 从token解析用户信息
       try{
