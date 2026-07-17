@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<link rel="icon" type="image/jpeg" href="assets/logo-64.jpg">
+<title>小闻房客宝 · 客户房源成交管理系统</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#2563eb;--primary-dark:#1d4ed8;--primary-light:#dbeafe;
+  --success:#16a34a;--success-light:#dcfce7;
+  --warning:#f59e0b;--warning-light:#fef3c7;
+  --danger:#dc2626;--danger-light:#fee2e2;
+  --purple:#7c3aed;--purple-light:#ede9fe;
+  --teal:#0d9488;--teal-light:#ccfbf1;
+  --gray-50:#f8fafc;--gray-100:#f1f5f9;--gray-200:#e2e8f0;
+  --gray-300:#cbd5e1;--gray-400:#94a3b8;--gray-500:#64748b;
+  --gray-600:#475569;--gray-700:#334155;--gray-800:#1e293b;
+  --bg:#f1f5f9;--card:#fff;--text:#1e293b;--text-muted:#64748b;
+  --radius:12px;--radius-sm:8px;--shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shadow-lg:0 10px 30px rgba(0,0,0,.15);--max-w:1280px;
+}
+html{font-size:16px;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:inherit;font-size:1rem}
+ul{list-style:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:3px}
+
+/* ===== Desktop Sidebar ===== */
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:220px;background:linear-gradient(180deg,var(--primary),var(--primary-dark));color:#fff;display:flex;flex-direction:column;z-index:100;box-shadow:2px 0 12px rgba(37,99,235,.2)}
+.sidebar-header{padding:18px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.12)}
+.sidebar-logo{width:38px;height:38px;border-radius:10px;overflow:hidden;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.sidebar-logo img{width:100%;height:100%;object-fit:cover}
+.sidebar-brand{flex:1;min-width:0}
+.sidebar-title{font-size:1rem;font-weight:700;white-space:nowrap}
+.sidebar-sub{font-size:.5625rem;opacity:.65;font-weight:400}
+.sidebar-search{position:relative;padding:10px 12px}
+.sidebar-search input{width:100%;height:34px;border:none;border-radius:17px;padding:0 14px 0 34px;background:rgba(255,255,255,.15);color:#fff;font-size:.8125rem;outline:none;transition:.2s}
+.sidebar-search input::placeholder{color:rgba(255,255,255,.55)}
+.sidebar-search input:focus{background:rgba(255,255,255,.25)}
+.sidebar-search svg{position:absolute;left:23px;top:50%;transform:translateY(-50%);opacity:.6}
+.sidebar-nav{flex:1;padding:4px 8px;overflow-y:auto}
+.sidebar-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:.875rem;font-weight:500;color:rgba(255,255,255,.65);cursor:pointer;transition:.2s;margin-bottom:2px;white-space:nowrap}
+.sidebar-nav-item svg{flex-shrink:0}
+.sidebar-nav-item:hover{color:#fff;background:rgba(255,255,255,.08)}
+.sidebar-nav-item.active{color:#fff;background:rgba(255,255,255,.18);font-weight:600}
+.sidebar-footer{padding:8px;border-top:1px solid rgba(255,255,255,.12)}
+.sidebar-footer-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:rgba(255,255,255,.65);font-size:.8125rem;cursor:pointer;transition:.2s;position:relative;width:100%}
+.sidebar-footer-btn:hover{color:#fff;background:rgba(255,255,255,.08)}
+.badge-dot{position:absolute;top:8px;right:12px;width:8px;height:8px;border-radius:50%;background:var(--danger);border:1.5px solid var(--primary-dark);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ===== Mobile Header ===== */
+.mobile-header{display:none;position:sticky;top:0;z-index:100;background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.mobile-header-inner{display:flex;align-items:center;justify-content:space-between;min-height:50px;padding:0 12px}
+.mobile-header-logo{display:flex;align-items:center;gap:6px}
+.mobile-header-logo img{width:28px;height:28px;border-radius:7px}
+.mobile-header-logo span{font-size:1rem;font-weight:700}
+.mobile-header-actions{display:flex;align-items:center;gap:8px}
+.mobile-header-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.mobile-header-btn:active{background:rgba(255,255,255,.3)}
+
+/* ===== Bottom Nav ===== */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--gray-200);z-index:100;box-shadow:0 -2px 10px rgba(0,0,0,.06);padding-bottom:env(safe-area-inset-bottom)}
+.bottom-nav-inner{display:flex;max-width:520px;margin:0 auto}
+.bottom-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0 4px;font-size:.625rem;color:var(--gray-400);cursor:pointer;transition:.2s;position:relative}
+.bottom-nav-item svg{width:22px;height:22px}
+.bottom-nav-item.active{color:var(--primary)}
+.bottom-nav-item .nav-badge{position:absolute;top:4px;right:50%;margin-right:-18px;width:8px;height:8px;border-radius:50%;background:var(--danger);border:1.5px solid #fff}
+
+/* ===== Layout ===== */
+.main-content{margin-left:220px;min-height:100vh}
+.app{max-width:var(--max-w);margin:0 auto;padding:0 20px 100px}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ===== Stats ===== */
+.stats{display:flex;gap:8px;padding:16px 0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.stats::-webkit-scrollbar{display:none}
+.stat-card{background:var(--card);border-radius:var(--radius-sm);padding:10px 14px;min-width:92px;text-align:center;box-shadow:var(--shadow);flex-shrink:0;cursor:pointer;transition:.2s;border:2px solid transparent}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.stat-card.active{border-color:var(--primary);background:var(--primary-light)}
+.stat-num{font-size:1.375rem;font-weight:700;line-height:1.2}
+.stat-label{font-size:.6875rem;color:var(--text-muted);margin-top:2px}
+.stat-card.danger .stat-num{color:var(--danger)}
+.stat-card.warning .stat-num{color:var(--warning)}
+.stat-card.success .stat-num{color:var(--success)}
+.stat-card.purple .stat-num{color:var(--purple)}
+.stat-card.teal .stat-num{color:var(--teal)}
+
+/* ===== Filter Bar ===== */
+.filter-bar{background:var(--card);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.filter-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;font-size:.8125rem;font-weight:600;color:var(--gray-700)}
+.filter-toggle .arrow{transition:.3s}
+.filter-toggle.open .arrow{transform:rotate(180deg)}
+.filter-body{overflow:hidden;max-height:0;transition:max-height .3s ease}
+.filter-body.open{max-height:600px}
+.filter-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.filter-group{display:flex;flex-direction:column;gap:3px;min-width:130px;flex:1}
+.filter-group label{font-size:.6875rem;color:var(--text-muted);font-weight:500}
+.filter-group select,.filter-group input{height:32px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 8px;background:var(--gray-50);font-size:.8125rem;outline:none;transition:.2s}
+.filter-group select:focus,.filter-group input:focus{border-color:var(--primary);background:#fff}
+.filter-actions{display:flex;gap:8px;margin-top:10px}
+.filter-actions button{padding:5px 12px;border-radius:var(--radius-sm);font-size:.75rem;font-weight:500;transition:.2s}
+.filter-actions .btn-reset{background:var(--gray-100);color:var(--gray-600)}
+.filter-actions .btn-reset:hover{background:var(--gray-200)}
+
+/* ===== Sub-tabs ===== */
+.subtabs{display:flex;gap:4px;margin-bottom:12px;background:var(--card);border-radius:var(--radius);padding:4px;box-shadow:var(--shadow)}
+.subtab{flex:1;padding:8px;border-radius:var(--radius-sm);font-size:.875rem;font-weight:500;color:var(--gray-500);transition:.2s;text-align:center}
+.subtab.active{background:var(--primary);color:#fff}
+.subtab:not(.active):hover{background:var(--gray-100)}
+
+/* ===== Toolbar ===== */
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:8px}
+.toolbar select{height:32px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 26px 0 10px;background:var(--card);font-size:.8125rem;outline:none;cursor:pointer}
+.result-count{font-size:.8125rem;color:var(--text-muted)}
+.result-count b{color:var(--primary)}
+
+/* ===== Client Cards ===== */
+.client-grid,.property-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.client-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);transition:.2s;position:relative;border-left:4px solid var(--gray-300);cursor:pointer}
+.client-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.client-card[data-grade="A"]{border-left-color:var(--danger)}
+.client-card[data-grade="B"]{border-left-color:var(--warning)}
+.client-card[data-grade="C"]{border-left-color:var(--primary)}
+.client-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.client-name{font-size:1rem;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.client-phone{font-size:.75rem;color:var(--text-muted);margin-top:2px}
+.client-phone a{color:var(--primary)}
+.grade-badge{padding:1px 7px;border-radius:10px;font-size:.625rem;font-weight:600;white-space:nowrap}
+.grade-badge[data-grade="A"]{background:var(--danger-light);color:var(--danger)}
+.grade-badge[data-grade="B"]{background:var(--warning-light);color:var(--warning)}
+.grade-badge[data-grade="C"]{background:var(--primary-light);color:var(--primary)}
+.status-badge{padding:1px 7px;border-radius:10px;font-size:.625rem;font-weight:500;white-space:nowrap}
+.status-badge[data-status="待联系"]{background:var(--gray-100);color:var(--gray-600)}
+.status-badge[data-status="已联系"]{background:var(--primary-light);color:var(--primary)}
+.status-badge[data-status="看房中"]{background:var(--warning-light);color:var(--warning)}
+.status-badge[data-status="谈判中"]{background:var(--purple-light);color:var(--purple)}
+.status-badge[data-status="已成交"]{background:var(--success-light);color:var(--success)}
+.status-badge[data-status="暂缓"]{background:var(--gray-100);color:var(--gray-400)}
+.status-badge[data-status="在售"]{background:var(--success-light);color:var(--success)}
+.status-badge[data-status="已售"]{background:var(--gray-100);color:var(--gray-500)}
+.status-badge[data-status="下架"]{background:var(--danger-light);color:var(--danger)}
+.status-badge[data-status="待售"]{background:var(--warning-light);color:var(--warning)}
+.status-badge[data-status="售罄"]{background:var(--gray-100);color:var(--gray-400)}
+.client-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.client-tag{background:var(--gray-100);color:var(--gray-600);padding:1px 6px;border-radius:4px;font-size:.625rem}
+.client-tag.custom{background:var(--teal-light);color:var(--teal)}
+.client-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:.6875rem;color:var(--text-muted);padding-top:8px;border-top:1px solid var(--gray-100)}
+.client-meta span{display:flex;align-items:center;gap:3px}
+.client-meta b{color:var(--gray-700);font-weight:500}
+.card-actions{display:flex;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-100)}
+.card-actions button{flex:1;padding:5px;border-radius:var(--radius-sm);font-size:.6875rem;font-weight:500;background:var(--gray-50);color:var(--gray-600);transition:.2s;display:flex;align-items:center;justify-content:center;gap:3px}
+.card-actions button:hover{background:var(--primary-light);color:var(--primary)}
+.card-actions button.danger:hover{background:var(--danger-light);color:var(--danger)}
+.need-followup{position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;background:var(--danger);animation:pulse 2s infinite}
+
+/* ===== Property Cards ===== */
+.property-card{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);transition:.2s;cursor:pointer;border-top:3px solid var(--primary)}
+.property-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.property-card[data-status="已售"],.property-card[data-status="下架"],.property-card[data-status="售罄"]{opacity:.65}
+.card-thumb{width:100%;height:140px;background:var(--gray-200);background-size:cover;background-position:center;position:relative}
+.card-thumb .type-label{position:absolute;top:6px;left:6px;padding:2px 8px;border-radius:4px;font-size:.625rem;font-weight:600;color:#fff;background:rgba(0,0,0,.55)}
+.card-thumb .media-count{position:absolute;bottom:6px;right:6px;padding:2px 6px;border-radius:4px;font-size:.625rem;color:#fff;background:rgba(0,0,0,.55);display:flex;align-items:center;gap:3px}
+.card-thumb.no-img{display:flex;align-items:center;justify-content:center;color:var(--gray-400)}
+.card-body{padding:12px}
+.card-title{font-size:.9375rem;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-price{font-size:1.0625rem;font-weight:700;color:var(--danger);margin-bottom:6px}
+.card-price .unit{font-size:.6875rem;color:var(--text-muted);font-weight:400}
+.card-info{display:flex;flex-wrap:wrap;gap:8px;font-size:.6875rem;color:var(--text-muted);margin-bottom:6px}
+.card-info span{display:flex;align-items:center;gap:2px}
+.prop-tags{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}
+
+/* ===== Empty ===== */
+.empty{text-align:center;padding:60px 20px;color:var(--text-muted)}
+.empty svg{margin-bottom:16px;opacity:.3}
+.empty h3{font-size:1.125rem;color:var(--gray-600);margin-bottom:4px}
+.empty p{font-size:.875rem}
+
+/* ===== FAB ===== */
+.fab{position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(37,99,235,.4);z-index:90;transition:.2s}
+.fab:hover{background:var(--primary-dark);transform:scale(1.08)}
+.fab svg{width:26px;height:26px}
+
+/* ===== Modal ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:var(--radius);width:100%;max-width:600px;margin:auto;box-shadow:var(--shadow-lg);animation:modalIn .25s ease;position:relative}
+@keyframes modalIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--gray-100);position:sticky;top:0;background:#fff;border-radius:var(--radius) var(--radius) 0 0;z-index:1}
+.modal-title{font-size:1.0625rem;font-weight:600}
+.modal-close{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--gray-400);transition:.2s}
+.modal-close:hover{background:var(--gray-100);color:var(--gray-600)}
+.modal-body{padding:18px;max-height:72vh;overflow-y:auto}
+.modal-footer{padding:14px 18px;border-top:1px solid var(--gray-100);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:#fff;border-radius:0 0 var(--radius) var(--radius)}
+
+/* ===== Forms ===== */
+.form-section{margin-bottom:20px}
+.form-section-title{font-size:.75rem;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:5px;border-bottom:1px solid var(--gray-100)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-field{margin-bottom:10px}
+.form-field label{display:block;font-size:.75rem;font-weight:500;color:var(--gray-600);margin-bottom:3px}
+.form-field label .req{color:var(--danger)}
+.form-field input,.form-field select,.form-field textarea{width:100%;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:7px 10px;font-size:.8125rem;outline:none;transition:.2s;background:#fff}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.form-field textarea{resize:vertical;min-height:60px}
+.form-field .hint{font-size:.625rem;color:var(--gray-400);margin-top:2px}
+.budget-row{display:flex;gap:8px;align-items:center}
+.budget-row span{color:var(--gray-400)}
+
+/* Tags Input */
+.tag-input-container{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);min-height:34px;background:#fff;transition:.2s}
+.tag-input-container:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.tag-chip{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:.75rem;background:var(--primary-light);color:var(--primary)}
+.tag-chip .remove{cursor:pointer;font-weight:bold;opacity:.6}
+.tag-chip .remove:hover{opacity:1}
+.tag-input-container input{border:none;outline:none;flex:1;min-width:80px;padding:4px;font-size:.75rem;background:transparent}
+
+/* Phone List */
+.phone-list{display:flex;flex-direction:column;gap:6px}
+.phone-row{display:flex;gap:6px;align-items:center}
+.phone-row select{width:80px;flex-shrink:0;height:32px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 6px;font-size:.75rem;background:#fff}
+.phone-row input{flex:1;height:32px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 8px;font-size:.75rem;outline:none}
+.phone-row input:focus{border-color:var(--primary)}
+.phone-row .del-phone{width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);flex-shrink:0}
+.phone-row .del-phone:hover{background:var(--danger-light);color:var(--danger)}
+.add-phone-btn{font-size:.75rem;color:var(--primary);padding:4px 0;display:inline-flex;align-items:center;gap:3px}
+.add-phone-btn:hover{text-decoration:underline}
+
+/* Checkbox Group */
+.checkbox-group{display:flex;flex-wrap:wrap;gap:5px}
+.checkbox-item{display:flex;align-items:center;gap:3px;padding:3px 10px;border:1px solid var(--gray-300);border-radius:14px;font-size:.75rem;cursor:pointer;transition:.2s;user-select:none}
+.checkbox-item:hover{border-color:var(--primary)}
+.checkbox-item.checked{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+
+/* ===== Buttons ===== */
+.btn{padding:7px 16px;border-radius:var(--radius-sm);font-size:.8125rem;font-weight:500;transition:.2s;display:inline-flex;align-items:center;gap:4px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-secondary{background:var(--gray-100);color:var(--gray-600)}
+.btn-secondary:hover{background:var(--gray-200)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{background:#b91c1c}
+.btn-outline{border:1px solid var(--gray-300);color:var(--gray-600)}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-sm{padding:5px 10px;font-size:.75rem}
+
+/* ===== Detail ===== */
+.detail-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.detail-avatar{width:46px;height:46px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:1.125rem;font-weight:700;color:var(--primary);flex-shrink:0}
+.detail-info h2{font-size:1.125rem}
+.detail-info .sub{font-size:.75rem;color:var(--text-muted);margin-top:2px}
+.detail-info .sub a{color:var(--primary)}
+.detail-badges{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;margin-bottom:16px}
+.detail-item{padding:6px 0;border-bottom:1px solid var(--gray-100);font-size:.8125rem}
+.detail-item .label{color:var(--text-muted);font-size:.6875rem;margin-bottom:1px}
+.detail-item .value{font-weight:500}
+.detail-section{margin-bottom:16px}
+.detail-section h3{font-size:.8125rem;font-weight:600;color:var(--gray-500);margin-bottom:8px;display:flex;align-items:center;gap:4px}
+.detail-section h3 .count{font-weight:400;color:var(--gray-400);font-size:.6875rem}
+
+/* Timeline */
+.followup-input{margin-bottom:14px}
+.followup-input textarea{width:100%;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:8px 10px;font-size:.8125rem;outline:none;transition:.2s;min-height:60px;resize:vertical}
+.followup-input textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.followup-options{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:.75rem;color:var(--gray-600)}
+.followup-options label{display:flex;align-items:center;gap:4px;cursor:pointer}
+.followup-options input[type=date]{height:28px;border:1px solid var(--gray-300);border-radius:4px;padding:0 6px;font-size:.75rem}
+.followup-input .actions{display:flex;justify-content:flex-end;margin-top:6px}
+.timeline{position:relative;padding-left:18px}
+.timeline::before{content:'';position:absolute;left:5px;top:4px;bottom:4px;width:2px;background:var(--gray-200)}
+.timeline-item{position:relative;padding-bottom:14px}
+.timeline-item:last-child{padding-bottom:0}
+.timeline-item::before{content:'';position:absolute;left:-17px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--primary);border:2px solid #fff;box-shadow:0 0 0 2px var(--primary-light)}
+.timeline-item.has-reminder::before{background:var(--danger);box-shadow:0 0 0 2px var(--danger-light)}
+.timeline-date{font-size:.6875rem;color:var(--text-muted);margin-bottom:2px;display:flex;align-items:center;gap:4px}
+.timeline-content{font-size:.8125rem;background:var(--gray-50);padding:6px 10px;border-radius:var(--radius-sm);word-break:break-word;white-space:pre-wrap}
+.timeline-empty{text-align:center;padding:20px;color:var(--gray-400);font-size:.8125rem}
+.reminder-tag{display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:8px;font-size:.625rem;background:var(--danger-light);color:var(--danger)}
+
+/* Viewing record */
+.viewing-item{background:var(--gray-50);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px}
+.viewing-item .vi-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.viewing-item .vi-prop{font-size:.8125rem;font-weight:500;color:var(--primary)}
+.viewing-item .vi-date{font-size:.6875rem;color:var(--text-muted)}
+.viewing-item .vi-feedback{font-size:.75rem;color:var(--gray-600);margin-top:2px}
+
+/* Referral */
+.referral-item{display:flex;align-items:center;gap:6px;font-size:.8125rem;padding:6px 10px;background:var(--gray-50);border-radius:var(--radius-sm);margin-bottom:4px}
+
+/* ===== Media Gallery ===== */
+.media-section{margin-bottom:16px}
+.media-upload-area{border:2px dashed var(--gray-300);border-radius:var(--radius);padding:20px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:12px}
+.media-upload-area:hover{border-color:var(--primary);background:var(--primary-light)}
+.media-upload-area p{font-size:.8125rem;color:var(--gray-500)}
+.media-upload-area .hint{font-size:.6875rem;color:var(--gray-400);margin-top:4px}
+.media-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px}
+.media-item{position:relative;border-radius:var(--radius-sm);overflow:hidden;aspect-ratio:1;background:var(--gray-100);cursor:pointer}
+.media-item img,.media-item video{width:100%;height:100%;object-fit:cover}
+.media-item .media-type{position:absolute;top:3px;left:3px;padding:1px 5px;border-radius:3px;font-size:.5625rem;color:#fff;background:rgba(0,0,0,.55)}
+.media-item .media-delete{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;opacity:0;transition:.2s}
+.media-item:hover .media-delete{opacity:1}
+
+/* ===== Lightbox ===== */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:400;display:none;align-items:center;justify-content:center;padding:20px}
+.lightbox.show{display:flex}
+.lightbox img,.lightbox video{max-width:95%;max-height:90vh;border-radius:8px}
+.lightbox-close{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.lightbox-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.lightbox-prev{left:16px}
+.lightbox-next{right:16px}
+
+/* ===== Dashboard ===== */
+.dash-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.dash-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.dash-card h3{font-size:.875rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.dash-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.dash-stat{text-align:center;padding:10px;background:var(--gray-50);border-radius:var(--radius-sm)}
+.dash-stat .num{font-size:1.5rem;font-weight:700}
+.dash-stat .lbl{font-size:.6875rem;color:var(--text-muted);margin-top:2px}
+
+/* Funnel */
+.funnel{display:flex;flex-direction:column;align-items:center;gap:2px}
+.funnel-step{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-radius:var(--radius-sm);color:#fff;font-size:.8125rem;font-weight:500;min-width:200px;transition:.2s}
+.funnel-step:hover{transform:scaleX(1.03)}
+.funnel-step .f-num{font-size:1rem;font-weight:700}
+
+/* Bar Chart */
+.bar-chart{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:flex;align-items:center;gap:8px}
+.bar-label{width:80px;font-size:.75rem;color:var(--gray-600);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:24px;background:var(--gray-100);border-radius:4px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:4px;transition:.3s;display:flex;align-items:center;justify:flex-end;padding-right:6px;color:#fff;font-size:.6875rem;font-weight:500;min-width:24px}
+.bar-value{font-size:.75rem;color:var(--gray-600);min-width:24px}
+
+/* Recent Activity */
+.activity-item{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--gray-100);font-size:.8125rem}
+.activity-item:last-child{border-bottom:none}
+.activity-item .a-time{color:var(--text-muted);font-size:.6875rem;flex-shrink:0;width:70px}
+.activity-item .a-text{flex:1}
+
+/* ===== Share View ===== */
+.share-view{background:#fff;border-radius:var(--radius);overflow:hidden;max-width:420px;width:100%}
+.share-header{padding:16px;text-align:center;background:linear-gradient(135deg,var(--primary),var(--purple));color:#fff}
+.share-header h2{font-size:1.25rem}
+.share-header p{font-size:.8125rem;opacity:.8;margin-top:4px}
+.share-body{padding:16px}
+.share-img{width:100%;border-radius:var(--radius-sm);margin-bottom:12px}
+.share-info-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray-100);font-size:.8125rem}
+.share-info-row .lbl{color:var(--text-muted)}
+.share-info-row .val{font-weight:500}
+.share-desc{margin-top:12px;padding:10px;background:var(--gray-50);border-radius:var(--radius-sm);font-size:.8125rem}
+.share-footer{padding:12px 16px;text-align:center;font-size:.75rem;color:var(--text-muted);border-top:1px solid var(--gray-100)}
+
+/* ===== Settings ===== */
+.settings-list{display:flex;flex-direction:column;gap:8px}
+.settings-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);cursor:pointer;transition:.2s}
+.settings-item:hover{border-color:var(--primary);background:var(--primary-light)}
+.settings-item .icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.settings-item .icon.blue{background:var(--primary-light);color:var(--primary)}
+.settings-item .icon.green{background:var(--success-light);color:var(--success)}
+.settings-item .icon.orange{background:var(--warning-light);color:var(--warning)}
+.settings-item .icon.red{background:var(--danger-light);color:var(--danger)}
+.settings-item .text{flex:1}
+.settings-item .text .title{font-size:.8125rem;font-weight:500}
+.settings-item .text .desc{font-size:.6875rem;color:var(--text-muted)}
+
+/* ===== Toast ===== */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--gray-800);color:#fff;padding:10px 24px;border-radius:24px;font-size:.8125rem;z-index:500;opacity:0;transition:.3s;white-space:nowrap;max-width:90%}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--danger)}
+
+/* ===== Confirm ===== */
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px}
+.confirm-overlay.show{display:flex}
+.confirm-box{background:#fff;border-radius:var(--radius);padding:24px;max-width:340px;width:100%;text-align:center;animation:modalIn .2s ease}
+.confirm-box h3{font-size:1rem;margin-bottom:8px}
+.confirm-box p{font-size:.8125rem;color:var(--text-muted);margin-bottom:20px}
+.confirm-box .actions{display:flex;gap:8px}
+.confirm-box .actions button{flex:1}
+
+/* ===== Select Client/Property (for viewings/referrals) ===== */
+.link-select{display:flex;gap:6px;margin-bottom:6px}
+.link-select select{flex:1;height:32px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 8px;font-size:.75rem;background:#fff}
+
+/* ===== Responsive ===== */
+@media(min-width:640px){
+  .client-grid,.property-grid{grid-template-columns:1fr 1fr}
+  .form-row{grid-template-columns:1fr 1fr 1fr}
+  .detail-grid{grid-template-columns:1fr 1fr 1fr}
+  .dash-grid{grid-template-columns:1fr 1fr}
+}
+@media(min-width:900px){
+  .client-grid,.property-grid{grid-template-columns:1fr 1fr 1fr}
+  .dash-grid{grid-template-columns:1fr 1fr 1fr}
+}
+@media(min-width:1280px){
+  .client-grid,.property-grid{grid-template-columns:1fr 1fr 1fr 1fr}
+}
+@media(max-width:1023px){
+  .sidebar{display:none}
+  .main-content{margin-left:0}
+  .mobile-header{display:block}
+  .bottom-nav{display:block}
+  .app{padding:0 12px 80px}
+  .fab{display:flex}
+  .form-row{grid-template-columns:1fr 1fr}
+  .detail-grid{grid-template-columns:1fr 1fr}
+  .stats{padding:12px 0 4px}
+  .stat-card{min-width:80px;padding:8px 10px}
+  .stat-num{font-size:1.125rem}
+  .dash-stats{grid-template-columns:1fr 1fr}
+  .modal{max-width:100%!important}
+  .dash-grid{grid-template-columns:1fr}
+  .showroom-subsections{grid-template-columns:1fr}
+  .fab{bottom:72px}
+}
+@media(min-width:1024px){
+  .fab{display:none}
+}
+
+/* ===== Password Lock Screen ===== */
+.lock-overlay{position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#1e3a5f,#2563eb);display:flex;align-items:center;justify-content:center;padding:20px}
+.lock-card{background:#fff;border-radius:20px;padding:36px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:lockIn .4s ease}
+@keyframes lockIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.lock-logo{width:80px;height:80px;margin:0 auto 16px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(37,99,235,.3);border:3px solid #fff;background:#fff}
+.lock-logo img{width:100%;height:100%;object-fit:cover}
+.lock-title{font-size:1.5rem;font-weight:700;color:var(--gray-800);margin-bottom:4px}
+.lock-subtitle{font-size:.8125rem;color:var(--text-muted);margin-bottom:24px}
+.lock-input-group{margin-bottom:16px;text-align:left}
+.lock-input-group label{display:block;font-size:.75rem;font-weight:500;color:var(--gray-600);margin-bottom:5px}
+.lock-input-group input{width:100%;height:42px;border:2px solid var(--gray-200);border-radius:10px;padding:0 14px;font-size:1rem;outline:none;transition:.2s;text-align:center;letter-spacing:4px}
+.lock-input-group input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.lock-btn{width:100%;height:44px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:.9375rem;font-weight:600;transition:.2s;margin-top:8px}
+.lock-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(37,99,235,.35)}
+.lock-error{color:var(--danger);font-size:.75rem;margin-top:8px;min-height:18px}
+.lock-hint{font-size:.6875rem;color:var(--gray-400);margin-top:16px}
+
+/* ===== Transaction Cards ===== */
+.tx-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);transition:.2s;border-left:4px solid var(--success);cursor:pointer;position:relative}
+.tx-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.tx-card[data-dealtype="newdev"]{border-left-color:var(--purple)}
+.tx-card[data-dealtype="secondhand"]{border-left-color:var(--primary)}
+.tx-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.tx-client{font-size:1rem;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tx-prop{font-size:.8125rem;color:var(--text-muted);margin-top:2px}
+.tx-price{font-size:1.25rem;font-weight:700;color:var(--danger)}
+.tx-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:.6875rem;color:var(--text-muted);padding-top:8px;border-top:1px solid var(--gray-100)}
+.deal-type-badge{padding:1px 7px;border-radius:10px;font-size:.625rem;font-weight:600;white-space:nowrap}
+.deal-type-badge[data-type="newdev"]{background:var(--purple-light);color:var(--purple)}
+.deal-type-badge[data-type="secondhand"]{background:var(--primary-light);color:var(--primary)}
+.deal-type-badge[data-type="other"]{background:var(--gray-100);color:var(--gray-500)}
+
+/* ===== Showroom (样板房) ===== */
+.showroom-section{margin-bottom:16px;border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden}
+.showroom-header{background:var(--gray-50);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:.2s}
+.showroom-header:hover{background:var(--gray-100)}
+.showroom-header h4{font-size:.875rem;font-weight:600;display:flex;align-items:center;gap:6px}
+.showroom-header .arrow{transition:.3s}
+.showroom-header.open .arrow{transform:rotate(180deg)}
+.showroom-body{overflow:hidden;max-height:0;transition:max-height .3s ease}
+.showroom-body.open{max-height:3000px}
+.showroom-subsections{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px}
+.showroom-subsection{border:1px solid var(--gray-200);border-radius:var(--radius-sm);overflow:hidden}
+.showroom-sub-header{padding:8px 10px;font-size:.75rem;font-weight:600;display:flex;align-items:center;gap:4px}
+.showroom-sub-header.experience{background:var(--purple-light);color:var(--purple)}
+.showroom-sub-header.delivery{background:var(--teal-light);color:var(--teal)}
+.showroom-sub-body{padding:8px}
+.showroom-upload{border:1.5px dashed var(--gray-300);border-radius:var(--radius-sm);padding:10px;text-align:center;cursor:pointer;transition:.2s}
+.showroom-upload:hover{border-color:var(--primary);background:var(--primary-light)}
+.showroom-upload p{font-size:.6875rem;color:var(--gray-500)}
+.showroom-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:4px;margin-top:6px}
+.showroom-gallery .media-item{aspect-ratio:1;border-radius:4px}
+.showroom-gallery .media-item img,.showroom-gallery .media-item video{width:100%;height:100%;object-fit:cover}
+.showroom-gallery .media-item .media-type{font-size:.5rem;padding:0 3px}
+.showroom-gallery .media-item .media-delete{width:16px;height:16px;font-size:.5rem}
+.showroom-empty{text-align:center;padding:10px;color:var(--gray-400);font-size:.6875rem}
+.area-segment-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.area-segment-chip{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;font-size:.75rem;background:var(--primary-light);color:var(--primary)}
+.area-segment-chip .remove{cursor:pointer;font-weight:bold;opacity:.6}
+.area-segment-chip .remove:hover{opacity:1}
+.area-segment-add{display:flex;gap:6px;margin-top:8px}
+.area-segment-add input{flex:1;height:32px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 8px;font-size:.75rem}
+@media(max-width:639px){.showroom-subsections{grid-template-columns:1fr}}
+
+/* ===== Settings Additional ===== */
+.settings-section{margin-bottom:16px}
+.settings-section-title{font-size:.6875rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--gray-100)}
+.user-role-badge{padding:2px 8px;border-radius:10px;font-size:.625rem;font-weight:600;background:var(--success-light);color:var(--success)}
+.creator-badge{display:inline-block;font-size:.625rem;color:var(--gray-500);background:var(--gray-100);padding:1px 6px;border-radius:8px;margin:2px 0}
+.icon.gray{background:var(--gray-100);color:var(--gray-400)}
+.lb-download-bar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:410}
+.lb-download-btn{padding:8px 20px;border-radius:20px;background:rgba(37,99,235,.9);color:#fff;font-size:.875rem;font-weight:500;backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.settings-item.disabled{opacity:.5;cursor:not-allowed}
+.settings-item.disabled:hover{border-color:var(--gray-200);background:transparent}
+
+/* ===== Brand Logo ===== */
+.brand-logo{display:flex;align-items:center;gap:6px}
+.brand-logo .logo-icon{width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.brand-logo .logo-icon img{width:100%;height:100%;object-fit:cover;border-radius:7px}
+.brand-logo .logo-text{font-size:1.0625rem;font-weight:700;white-space:nowrap}
+.brand-logo .logo-sub{font-size:.5625rem;opacity:.7;font-weight:400;margin-top:-1px}
+</style>
+</head>
+<body>
+
+<!-- ===== Password Lock Screen ===== -->
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-card">
+    <div class="lock-logo">
+      <img src="assets/logo-128.jpg" class="lock-avatar" alt="小闻房客宝">
+    </div>
+    <div class="lock-title">小闻房客宝</div>
+    <div class="lock-subtitle" id="lockSubtitle">请登录</div>
+    <div id="lockForm">
+      <div class="lock-input-group" id="lockUsernameGroup">
+        <label>用户名</label>
+        <input type="text" id="lockUsername" placeholder="输入用户名" maxlength="30" autocomplete="off">
+      </div>
+      <div class="lock-input-group" id="lockNameGroup" style="display:none">
+        <label>姓名</label>
+        <input type="text" id="lockName" placeholder="你的姓名" maxlength="20" autocomplete="off">
+      </div>
+      <div class="lock-input-group" id="lockPhoneGroup" style="display:none">
+        <label>手机号</label>
+        <input type="tel" id="lockPhone" placeholder="联系电话" maxlength="11" autocomplete="off">
+      </div>
+      <div class="lock-input-group" id="lockPwGroup">
+        <label>密码</label>
+        <input type="password" id="lockPassword" placeholder="输入密码" maxlength="20" autocomplete="off">
+      </div>
+      <div class="lock-input-group" id="lockPwConfirmGroup" style="display:none">
+        <label>确认密码</label>
+        <input type="password" id="lockPasswordConfirm" placeholder="再次输入密码" maxlength="20" autocomplete="off">
+      </div>
+      <button class="lock-btn" id="lockUnlockBtn">登录</button>
+      <div class="lock-error" id="lockError"></div>
+    </div>
+    <div class="lock-hint" id="lockHint">联系管理员获取账号</div>
+  </div>
+</div>
+<!-- ===== Desktop Sidebar ===== -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo"><img src="assets/logo.jpg" alt="小闻房客宝"></div>
+    <div class="sidebar-brand">
+      <div class="sidebar-title">小闻房客宝</div>
+      <div class="sidebar-sub">客户·房源·成交管理</div>
+    </div>
+  </div>
+  <div class="sidebar-search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="搜索客户/房源…" />
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-nav-item active" data-tab="clients">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>客户管理</span>
+    </div>
+    <div class="sidebar-nav-item" data-tab="properties">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>房源管理</span>
+    </div>
+    <div class="sidebar-nav-item" data-tab="transactions">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span>成交记录</span>
+    </div>
+    <div class="sidebar-nav-item" data-tab="dashboard">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      <span>数据看板</span>
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-btn" id="settingsBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>设置管理</span>
+      <span class="badge-dot" id="reminderBadge" style="display:none"></span>
+    </div>
+  </div>
+</aside>
+
+<!-- ===== Mobile Header ===== -->
+<header class="mobile-header">
+  <div class="mobile-header-inner">
+    <div class="mobile-header-logo">
+      <img src="assets/logo-64.jpg" alt="logo">
+      <span>小闻房客宝</span>
+    </div>
+    <div class="mobile-header-actions">
+      <div class="mobile-header-btn" id="mobileSearchBtn" title="搜索">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </div>
+      <div class="mobile-header-btn" id="settingsBtnMobile" title="设置">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="badge-dot" id="reminderBadgeMobile" style="display:none"></span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Mobile Search Overlay ===== -->
+<div id="mobileSearchOverlay" style="display:none;position:fixed;top:0;left:0;right:0;z-index:110;background:#fff;padding:8px 12px;box-shadow:0 2px 8px rgba(0,0,0,.1);align-items:center;gap:8px">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <input type="text" id="searchInputMobile" placeholder="搜索客户/房源…" style="flex:1;height:36px;border:none;outline:none;font-size:.875rem">
+  <button id="closeMobileSearch" style="font-size:.8125rem;color:#64748b;white-space:nowrap">取消</button>
+</div>
+
+<div class="main-content">
+
+<!-- ===== Tab: Clients ===== -->
+<div class="tab-content active" id="tab-clients">
+  <div class="app">
+    <div class="stats" id="statsBar"></div>
+    <div class="filter-bar">
+      <button class="filter-toggle" id="filterToggle">
+        <span>筛选条件</span>
+        <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="filter-body" id="filterBody">
+        <div class="filter-row">
+          <div class="filter-group"><label>客户等级</label><select id="fGrade"><option value="">全部</option><option value="A">A · 高意向</option><option value="B">B · 中意向</option><option value="C">C · 低意向</option></select></div>
+          <div class="filter-group"><label>当前状态</label><select id="fStatus"><option value="">全部</option><option>待联系</option><option>已联系</option><option>看房中</option><option>谈判中</option><option>已成交</option><option>暂缓</option></select></div>
+          <div class="filter-group"><label>购房目的</label><select id="fPurpose"><option value="">全部</option><option>刚需</option><option>改善</option><option>投资</option><option>学区</option></select></div>
+          <div class="filter-group"><label>客户来源</label><select id="fSource"><option value="">全部</option><option>自来客</option><option>转介绍</option><option>线上咨询</option><option>老客户回访</option><option>贝壳平台</option><option>抖音/视频号</option></select></div>
+          <div class="filter-group"><label>目标区域</label><select id="fArea"><option value="">全部</option><option>临平</option><option>余杭</option><option>萧山</option><option>拱墅</option><option>西湖</option><option>上城</option><option>滨江</option><option>钱塘</option><option>富阳</option><option>临安</option></select></div>
+          <div class="filter-group"><label>预算下限（万）</label><input type="number" id="fBudgetMin" placeholder="0" min="0"></div>
+          <div class="filter-group"><label>预算上限（万）</label><input type="number" id="fBudgetMax" placeholder="不限" min="0"></div>
+          <div class="filter-group"><label>需要跟进</label><select id="fNeedFollow"><option value="">全部</option><option value="7">7天未跟进</option><option value="14">14天未跟进</option><option value="30">30天未跟进</option></select></div>
+          <div class="filter-group"><label>自定义标签</label><input type="text" id="fTag" placeholder="输入标签筛选"></div>
+          <div class="filter-group" id="creatorFilter" style="display:none"><label>录入人</label><select id="creatorFilterSelect"><option value="">全部</option></select></div>
+        </div>
+        <div class="filter-actions"><button class="btn-reset" id="filterReset">清除筛选</button></div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <select id="sortSelect"><option value="updatedAt">最近更新</option><option value="createdAt">最新录入</option><option value="name">姓名</option><option value="grade">等级优先</option><option value="lastFollowup">最近跟进</option></select>
+        <span class="result-count" id="resultCount"></span>
+      </div>
+      <div class="toolbar-right"><button class="btn btn-primary" id="addClientBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增客户</button></div>
+    </div>
+    <div class="client-grid" id="clientGrid"></div>
+  </div>
+</div>
+
+<!-- ===== Tab: Properties ===== -->
+<div class="tab-content" id="tab-properties">
+  <div class="app">
+    <div class="subtabs">
+      <button class="subtab active" data-subtab="secondhand">二手房</button>
+      <button class="subtab" data-subtab="newdev">新楼盘</button>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-toggle" id="propFilterToggle">
+        <span>房源筛选</span>
+        <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="filter-body" id="propFilterBody">
+        <div class="filter-row">
+          <div class="filter-group"><label>区域</label><select id="pfArea"><option value="">全部</option><option>临平</option><option>余杭</option><option>萧山</option><option>拱墅</option><option>西湖</option><option>上城</option><option>滨江</option><option>钱塘</option><option>富阳</option><option>临安</option></select></div>
+          <div class="filter-group"><label>状态</label><select id="pfStatus"><option value="">全部</option><option>在售</option><option>已售</option><option>下架</option><option>待售</option><option>售罄</option></select></div>
+          <div class="filter-group"><label>价格下限（万）</label><input type="number" id="pfMin" placeholder="0" min="0"></div>
+          <div class="filter-group"><label>价格上限（万）</label><input type="number" id="pfMax" placeholder="不限" min="0"></div>
+          <div class="filter-group"><label>户型</label><input type="text" id="pfLayout" placeholder="如3室"></div>
+          <div class="filter-group"><label>标签</label><input type="text" id="pfTag" placeholder="输入标签"></div>
+        </div>
+        <div class="filter-actions"><button class="btn-reset" id="propFilterReset">清除筛选</button></div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <select id="propSortSelect"><option value="updatedAt">最近更新</option><option value="createdAt">最新录入</option><option value="totalPrice">总价升序</option><option value="totalPriceDesc">总价降序</option></select>
+        <span class="result-count" id="propResultCount"></span>
+      </div>
+      <div class="toolbar-right"><button class="btn btn-primary" id="addPropBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增房源</button></div>
+    </div>
+    <div class="property-grid" id="propertyGrid"></div>
+  </div>
+</div>
+
+<!-- ===== Tab: Transactions ===== -->
+<div class="tab-content" id="tab-transactions">
+  <div class="app">
+    <div class="stats" id="txStatsBar"></div>
+    <div class="filter-bar">
+      <button class="filter-toggle" id="txFilterToggle">
+        <span>筛选条件</span>
+        <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="filter-body" id="txFilterBody">
+        <div class="filter-row">
+          <div class="filter-group"><label>成交类型</label><select id="txfType"><option value="">全部</option><option value="newdev">新房</option><option value="secondhand">二手房</option><option value="other">其他</option></select></div>
+          <div class="filter-group"><label>开始日期</label><input type="date" id="txfDateFrom"></div>
+          <div class="filter-group"><label>结束日期</label><input type="date" id="txfDateTo"></div>
+          <div class="filter-group"><label>客户姓名</label><input type="text" id="txfClient" placeholder="输入客户名"></div>
+          <div class="filter-group"><label>价格下限（万）</label><input type="number" id="txfMin" placeholder="0" min="0"></div>
+          <div class="filter-group"><label>价格上限（万）</label><input type="number" id="txfMax" placeholder="不限" min="0"></div>
+        </div>
+        <div class="filter-actions"><button class="btn-reset" id="txFilterReset">清除筛选</button></div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <select id="txSortSelect"><option value="transactionDate">成交日期</option><option value="createdAt">录入时间</option><option value="transactionPriceDesc">成交价高到低</option><option value="transactionPriceAsc">成交价低到高</option></select>
+        <span class="result-count" id="txResultCount"></span>
+      </div>
+      <div class="toolbar-right"><button class="btn btn-primary" id="addTxBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>录入成交</button></div>
+    </div>
+    <div class="client-grid" id="txGrid"></div>
+  </div>
+</div>
+
+<!-- ===== Tab: Dashboard ===== -->
+<div class="tab-content" id="tab-dashboard">
+  <div class="app">
+    <div class="dash-grid" id="dashboardContent"></div>
+  </div>
+</div>
+
+<!-- ===== FAB ===== -->
+<button class="fab" id="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+
+<!-- ===== Bottom Nav (Mobile) ===== -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <div class="bottom-nav-item active" data-tab="clients">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>客户</span>
+    </div>
+    <div class="bottom-nav-item" data-tab="properties">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>房源</span>
+    </div>
+    <div class="bottom-nav-item" data-tab="transactions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span>成交</span>
+    </div>
+    <div class="bottom-nav-item" data-tab="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      <span>看板</span>
+    </div>
+    <div class="bottom-nav-item" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>设置</span>
+    </div>
+  </div>
+</nav>
+
+</div><!-- /.main-content -->
+
+<!-- ===== Client Form Modal ===== -->
+<div class="modal-overlay" id="clientFormModal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title" id="clientFormTitle">新增客户</span><button class="modal-close" data-close="clientFormModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <form id="clientForm" onsubmit="return false">
+        <input type="hidden" id="cfId">
+        <div class="form-section">
+          <div class="form-section-title">基本信息</div>
+          <div class="form-row">
+            <div class="form-field"><label>姓名 <span class="req">*</span></label><input type="text" id="cfName" required placeholder="如：王先生"></div>
+            <div class="form-field"><label>微信号</label><input type="text" id="cfWechat" placeholder="选填"></div>
+            <div class="form-field"><label>性别</label><select id="cfGender"><option value="未知">未知</option><option value="男">男</option><option value="女">女</option></select></div>
+          </div>
+          <div class="form-field">
+            <label>电话号码 <span class="req">*</span></label>
+            <div class="phone-list" id="cfPhoneList"></div>
+            <button type="button" class="add-phone-btn" id="cfAddPhone">+ 添加电话</button>
+          </div>
+          <div class="form-row">
+            <div class="form-field"><label>客户来源</label><select id="cfSource"><option>自来客</option><option>转介绍</option><option>线上咨询</option><option>老客户回访</option><option>贝壳平台</option><option>抖音/视频号</option></select></div>
+            <div class="form-field"><label>客户等级</label><select id="cfGrade"><option value="A">A · 高意向</option><option value="B">B · 中意向</option><option value="C">C · 低意向</option></select></div>
+            <div class="form-field"><label>当前状态</label><select id="cfStatus"><option>待联系</option><option>已联系</option><option>看房中</option><option>谈判中</option><option>已成交</option><option>暂缓</option></select></div>
+          </div>
+          <div class="form-field"><label>自定义标签</label><div class="tag-input-container" id="cfTagContainer"><input type="text" id="cfTagInput" placeholder="输入后回车添加"></div></div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">购房需求</div>
+          <div class="form-row">
+            <div class="form-field"><label>购房目的</label><select id="cfPurpose"><option>刚需</option><option>改善</option><option>投资</option><option>学区</option></select></div>
+            <div class="form-field"><label>物业类型</label><select id="cfPropertyType"><option>住宅</option><option>公寓</option><option>别墅</option><option>排屋</option><option>商铺</option></select></div>
+            <div class="form-field"><label>户型需求</label><select id="cfUnitType"><option>不限</option><option>1室</option><option>2室</option><option>3室</option><option>4室</option><option>4室+</option></select></div>
+          </div>
+          <div class="form-field"><label>预算范围（万元）</label><div class="budget-row"><input type="number" id="cfBudgetMin" placeholder="最低" min="0"><span>—</span><input type="number" id="cfBudgetMax" placeholder="最高" min="0"></div></div>
+          <div class="form-field"><label>目标区域（可多选）</label><div class="checkbox-group" id="cfAreaGroup"></div></div>
+          <div class="form-field"><label>其他需求</label><textarea id="cfRequirements" placeholder="如：需要车位、学区要求、楼层偏好、朝向等"></textarea></div>
+        </div>
+        <div class="form-field"><label>备注</label><textarea id="cfNotes" placeholder="客户性格、沟通偏好、特殊关注点等"></textarea></div>
+      </form>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-close="clientFormModal">取消</button><button class="btn btn-primary" id="saveClientBtn">保存</button></div>
+  </div>
+</div>
+
+<!-- ===== Client Detail Modal ===== -->
+<div class="modal-overlay" id="clientDetailModal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header"><span class="modal-title">客户详情</span><button class="modal-close" data-close="clientDetailModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body" id="clientDetailBody"></div>
+    <div class="modal-footer"><button class="btn btn-danger" id="deleteClientBtn" style="margin-right:auto">删除</button><button class="btn btn-outline" data-close="clientDetailModal">关闭</button><button class="btn btn-primary" id="editClientBtn">编辑</button></div>
+  </div>
+</div>
+
+<!-- ===== Property Form Modal ===== -->
+<div class="modal-overlay" id="propFormModal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title" id="propFormTitle">新增房源</span><button class="modal-close" data-close="propFormModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <form id="propForm" onsubmit="return false">
+        <input type="hidden" id="pfId">
+        <input type="hidden" id="pfType" value="secondhand">
+        <div class="form-section">
+          <div class="form-section-title">基本信息</div>
+          <div class="form-row">
+            <div class="form-field"><label>房源名称/标题 <span class="req">*</span></label><input type="text" id="pfTitle" required placeholder="如：临平新城精装三房"></div>
+            <div class="form-field" data-show="secondhand"><label>小区名称 <span class="req">*</span></label><input type="text" id="pfCommunity" placeholder="如：临平新城"></div>
+            <div class="form-field" data-show="newdev"><label>开发商</label><input type="text" id="pfDeveloper" placeholder="如：万科"></div>
+            <div class="form-field"><label>区域 <span class="req">*</span></label><select id="pfDistrict"><option>临平</option><option>余杭</option><option>萧山</option><option>拱墅</option><option>西湖</option><option>上城</option><option>滨江</option><option>钱塘</option><option>富阳</option><option>临安</option></select></div>
+            <div class="form-field" style="grid-column:1/-1"><label>详细地址</label><input type="text" id="pfAddress" placeholder="详细地址"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field" data-show="secondhand"><label>总价（万） <span class="req">*</span></label><input type="number" id="pfTotalPrice" placeholder="如：380" min="0"></div>
+            <div class="form-field" data-show="secondhand"><label>面积（㎡）</label><input type="number" id="pfArea" placeholder="如：89" min="0"></div>
+            <div class="form-field" data-show="secondhand"><label>单价（元/㎡）</label><input type="text" id="pfUnitPrice" placeholder="自动计算" readonly></div>
+            <div class="form-field" data-show="newdev"><label>均价（元/㎡） <span class="req">*</span></label><input type="number" id="pfAvgPrice" placeholder="如：30000" min="0"></div>
+            <div class="form-field" data-show="newdev"><label>物业类型</label><select id="pfPropType2"><option>住宅</option><option>公寓</option><option>别墅</option><option>排屋</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field" data-show="secondhand"><label>户型</label><input type="text" id="pfLayout" placeholder="如：3室2厅1卫"></div>
+            <div class="form-field" data-show="secondhand"><label>楼层</label><input type="text" id="pfFloor" placeholder="如：5"></div>
+            <div class="form-field" data-show="secondhand"><label>总楼层</label><input type="text" id="pfTotalFloors" placeholder="如：18"></div>
+            <div class="form-field" data-show="secondhand"><label>朝向</label><select id="pfOrientation"><option value="">未知</option><option>南北通透</option><option>朝南</option><option>朝北</option><option>朝东</option><option>朝西</option><option>东南</option><option>西南</option></select></div>
+            <div class="form-field" data-show="secondhand"><label>装修</label><select id="pfDecoration"><option value="">未知</option><option>精装</option><option>简装</option><option>毛坯</option><option>豪装</option></select></div>
+            <div class="form-field" data-show="secondhand"><label>建成年代</label><input type="text" id="pfBuildingAge" placeholder="如：2018年"></div>
+            <div class="form-field" data-show="secondhand"><label>产权性质</label><select id="pfPropertyRights"><option value="">未知</option><option>商品房</option><option>房改房</option><option>安置房</option><option>经济适用房</option></select></div>
+            <div class="form-field" data-show="secondhand"><label>是否有钥匙</label><select id="pfHasKey"><option value="0">否</option><option value="1">是</option></select></div>
+            <div class="form-field" data-show="secondhand"><label>看房方式</label><input type="text" id="pfViewingMethod" placeholder="如：随时看房"></div>
+            <div class="form-field" data-show="secondhand"><label>学区</label><input type="text" id="pfSchool" placeholder="如：临平一小"></div>
+            <div class="form-field" data-show="secondhand"><label>地铁</label><input type="text" id="pfMetro" placeholder="如：地铁1号线临平站"></div>
+            <div class="form-field" data-show="newdev"><label>开盘时间</label><input type="text" id="pfOpeningDate" placeholder="如：2026-06"></div>
+            <div class="form-field" data-show="newdev"><label>交房时间</label><input type="text" id="pfDeliveryDate" placeholder="如：2028-06"></div>
+            <div class="form-field" data-show="newdev"><label>在售户型</label><input type="text" id="pfAvailLayouts" placeholder="如：89-120㎡"></div>
+            <div class="form-field" data-show="newdev"><label>总户数</label><input type="text" id="pfTotalUnits" placeholder="如：500"></div>
+            <div class="form-field" data-show="newdev"><label>绿化率</label><input type="text" id="pfGreenRate" placeholder="如：35%"></div>
+            <div class="form-field" data-show="newdev"><label>容积率</label><input type="text" id="pfPlotRatio" placeholder="如：2.5"></div>
+            <div class="form-field" data-show="newdev"><label>售楼处电话</label><input type="text" id="pfSalesOffice" placeholder="如：0571-88888888"></div>
+            <div class="form-field" data-show="newdev" style="grid-column:1/-1">
+              <label>样板房面积段</label>
+              <div class="area-segment-list" id="pfAreaSegments"></div>
+              <div class="area-segment-add">
+                <input type="text" id="pfAreaSegInput" placeholder="如：89㎡、120㎡、140㎡">
+                <button type="button" class="btn btn-outline btn-sm" id="pfAddAreaSeg">添加</button>
+              </div>
+              <div class="hint">添加面积段后，可在房源详情中按面积段上传样板房视频</div>
+            </div>
+            <div class="form-field"><label>状态</label><select id="pfStatus"><option>在售</option><option>已售</option><option>下架</option><option>待售</option><option>售罄</option></select></div>
+          </div>
+          <div class="form-field"><label>房源标签</label><div class="tag-input-container" id="pfTagContainer"><input type="text" id="pfTagInput" placeholder="输入后回车添加，如：精装、学区房"></div></div>
+          <div class="form-field"><label>房源描述</label><textarea id="pfDesc" placeholder="房源亮点、周边配套、交通等"></textarea></div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-close="propFormModal">取消</button><button class="btn btn-primary" id="savePropBtn">保存</button></div>
+  </div>
+</div>
+
+<!-- ===== Property Detail Modal ===== -->
+<div class="modal-overlay" id="propDetailModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header"><span class="modal-title">房源详情</span><button class="modal-close" data-close="propDetailModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body" id="propDetailBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="deletePropBtn" style="margin-right:auto">删除</button>
+      <button class="btn btn-outline" id="sharePropBtn">复制信息</button>
+      <button class="btn btn-outline" id="shareCardBtn">分享卡片</button>
+      <button class="btn btn-outline" data-close="propDetailModal">关闭</button>
+      <button class="btn btn-primary" id="editPropBtn">编辑</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Settings Modal ===== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><span class="modal-title">数据管理</span><button class="modal-close" data-close="settingsModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="settings-list">
+        <div class="settings-item" id="exportJSON"><div class="icon blue"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><div class="text"><div class="title">导出备份（JSON）</div><div class="desc">保存全部数据，可恢复</div></div></div>
+        <div class="settings-item" id="exportCSV"><div class="icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><div class="text"><div class="title">导出客户Excel（CSV）</div><div class="desc">导出客户列表为表格</div></div></div>
+        <div class="settings-item" id="importJSON"><div class="icon orange"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div><div class="text"><div class="title">导入备份</div><div class="desc">从JSON文件恢复数据</div></div></div>
+        <div class="settings-item" id="clearAll"><div class="icon red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div><div class="text"><div class="title">清空全部数据</div><div class="desc">谨慎操作，不可恢复</div></div></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">账号</div>
+        <div class="settings-list">
+          <div class="settings-item" id="userMgmtBtn"><div class="icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="text"><div class="title">用户管理</div><div class="desc">添加/删除成员，授权使用</div></div></div>
+          <div class="settings-item" id="logoutBtn"><div class="icon red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div><div class="text"><div class="title">退出登录</div><div class="desc">安全退出当前账号</div></div></div>
+        </div>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-close="settingsModal">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== Transaction Form Modal ===== -->
+<div class="modal-overlay" id="txFormModal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title" id="txFormTitle">录入成交记录</span><button class="modal-close" data-close="txFormModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <form id="txForm" onsubmit="return false">
+        <input type="hidden" id="txfId">
+        <div class="form-section">
+          <div class="form-section-title">客户与房源</div>
+          <div class="form-row">
+            <div class="form-field"><label>成交客户 <span class="req">*</span></label><select id="txfClient"><option value="">请选择客户</option></select></div>
+            <div class="form-field"><label>成交房源</label><select id="txfProperty"><option value="">选择已有房源</option></select></div>
+          </div>
+          <div class="form-field"><label>或手动输入房源名称</label><input type="text" id="txfPropName" placeholder="如不选已有房源，可手动输入"></div>
+          <div class="form-row">
+            <div class="form-field"><label>成交类型 <span class="req">*</span></label><select id="txfDealType"><option value="secondhand">二手房</option><option value="newdev">新房</option><option value="other">其他</option></select></div>
+            <div class="form-field"><label>成交日期 <span class="req">*</span></label><input type="date" id="txfDate"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">成交信息</div>
+          <div class="form-row">
+            <div class="form-field"><label>成交总价（万） <span class="req">*</span></label><input type="number" id="txfPrice" placeholder="如：380" min="0" step="0.1"></div>
+            <div class="form-field"><label>成交单价（元/㎡）</label><input type="text" id="txfUnitPrice" placeholder="选填"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field"><label>佣金收入（元）</label><input type="number" id="txfCommission" placeholder="如：15000" min="0"></div>
+            <div class="form-field"><label>佣金比例（%）</label><input type="number" id="txfCommissionRate" placeholder="如：1.5" min="0" step="0.01"></div>
+          </div>
+          <div class="form-field"><label>备注</label><textarea id="txfNotes" placeholder="成交细节、特殊约定等"></textarea></div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-close="txFormModal">取消</button><button class="btn btn-primary" id="saveTxBtn">保存</button></div>
+  </div>
+</div>
+
+<!-- ===== Transaction Detail Modal ===== -->
+<div class="modal-overlay" id="txDetailModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header"><span class="modal-title">成交详情</span><button class="modal-close" data-close="txDetailModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body" id="txDetailBody"></div>
+    <div class="modal-footer"><button class="btn btn-danger" id="deleteTxBtn" style="margin-right:auto">删除</button><button class="btn btn-outline" data-close="txDetailModal">关闭</button><button class="btn btn-primary" id="editTxBtn">编辑</button></div>
+  </div>
+</div>
+
+<!-- ===== Password Change Modal ===== -->
+<div class="modal-overlay" id="pwChangeModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header"><span class="modal-title">修改密码</span><button class="modal-close" data-close="pwChangeModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="form-field"><label>当前密码</label><input type="password" id="pwOld" placeholder="输入当前密码" maxlength="20"></div>
+      <div class="form-field"><label>新密码</label><input type="password" id="pwNew" placeholder="输入新密码" maxlength="20"></div>
+      <div class="form-field"><label>确认新密码</label><input type="password" id="pwNewConfirm" placeholder="再次输入新密码" maxlength="20"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-close="pwChangeModal">取消</button><button class="btn btn-primary" id="savePwBtn">确认修改</button></div>
+  </div>
+</div>
+
+<!-- ===== User Management Modal ===== -->
+<div class="modal-overlay" id="userMgmtModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><span class="modal-title">用户管理</span><button class="modal-close" data-close="userMgmtModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="settings-section">
+        <div class="settings-section-title">当前用户</div>
+        <div class="settings-item" style="cursor:default"><div class="icon blue"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="text"><div class="title"><span class="current-user-name">管理员</span> <span class="user-role-badge current-user-role">管理员</span></div><div class="desc">拥有全部权限</div></div></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">团队成员</div>
+        <div id="memberList"><p style="text-align:center;padding:20px;color:var(--gray-400);font-size:.8125rem">加载中…</p></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">添加新成员</div>
+        <div style="display:grid;gap:8px">
+          <input type="text" id="newMemberUsername" placeholder="用户名（登录用）" class="form-input" style="height:36px;border:1px solid var(--gray-300);border-radius:8px;padding:0 12px;font-size:.875rem">
+          <input type="text" id="newMemberName" placeholder="姓名（显示用）" class="form-input" style="height:36px;border:1px solid var(--gray-300);border-radius:8px;padding:0 12px;font-size:.875rem">
+          <input type="tel" id="newMemberPhone" placeholder="手机号（选填）" class="form-input" style="height:36px;border:1px solid var(--gray-300);border-radius:8px;padding:0 12px;font-size:.875rem">
+          <input type="password" id="newMemberPassword" placeholder="设置密码（至少4位）" class="form-input" style="height:36px;border:1px solid var(--gray-300);border-radius:8px;padding:0 12px;font-size:.875rem">
+          <button class="btn btn-primary" id="addMemberBtn" style="margin-top:4px">添加成员</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-close="userMgmtModal">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== Share Modal ===== -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><span class="modal-title">分享卡片</span><button class="modal-close" data-close="shareModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body" id="shareModalBody"></div>
+    <div class="modal-footer"><button class="btn btn-outline" id="copyShareBtn">复制文字版</button><button class="btn btn-primary" data-close="shareModal">关闭</button></div>
+  </div>
+</div>
+
+<!-- ===== Lightbox ===== -->
+<div class="lightbox" id="lightbox">
+  <div class="lightbox-close" id="lbClose"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+  <div class="lightbox-nav lightbox-prev" id="lbPrev"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></div>
+  <div class="lightbox-nav lightbox-next" id="lbNext"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+  <div id="lbContent"></div>
+</div>
+
+<!-- ===== Confirm ===== -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box"><h3 id="confirmTitle">确认操作</h3><p id="confirmMsg"></p><div class="actions"><button class="btn btn-secondary" id="confirmCancel">取消</button><button class="btn btn-danger" id="confirmOK">确认</button></div></div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
