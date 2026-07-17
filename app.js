@@ -1395,6 +1395,7 @@ function openTxForm(id){
   propSel.innerHTML='<option value="">选择已有房源</option>'+S.properties.map(function(p){return'<option value="'+p.id+'">'+esc(p.title)+' ('+esc(p.district)+')</option>'}).join('');
   var t=id?findTx(id):{};
   document.getElementById('txfClient').value=t.clientId||'';
+  document.getElementById('txfClientName').value=t.clientName&&!t.clientId?t.clientName:'';
   document.getElementById('txfProperty').value=t.propertyId||'';
   document.getElementById('txfPropName').value=t.propertyTitle&&!t.propertyId?t.propertyTitle:'';
   document.getElementById('txfDealType').value=t.dealType||'secondhand';
@@ -1425,7 +1426,8 @@ function saveTx(){
   var clientId=document.getElementById('txfClient').value;
   var clientName='';
   if(clientId){var c=findClient(clientId);clientName=c?c.name:''}
-  if(!clientName){toast('请选择客户','error');return}
+  if(!clientName){clientName=document.getElementById('txfClientName').value.trim()}
+  if(!clientName){toast('请选择或输入客户','error');return}
   var propertyId=document.getElementById('txfProperty').value;
   var propertyTitle=document.getElementById('txfPropName').value.trim();
   if(!propertyId&&!propertyTitle){
@@ -1707,8 +1709,8 @@ function setupHandlers(){
     else if(key==='min'||key==='max'){S.txFilters[key]=parseFloat(this.value)||0}
     else{S.txFilters[key]=this.value.trim()}
     renderTxList()})}
-  btxf('txfType','type');btxf('txfDateFrom','dateFrom');btxf('txfDateTo','dateTo');btxf('txfClient','client','input');btxf('txfMin','min','input');btxf('txfMax','max','input');
-  document.getElementById('txFilterReset').addEventListener('click',function(){S.txFilters={};['txfType','txfDateFrom','txfDateTo','txfClient','txfMin','txfMax'].forEach(function(id){document.getElementById(id).value=''});renderTxList()});
+  btxf('txfType','type');btxf('txfDateFrom','dateFrom');btxf('txfDateTo','dateTo');btxf('txFilterClient','client','input');btxf('txfMin','min','input');btxf('txfMax','max','input');
+  document.getElementById('txFilterReset').addEventListener('click',function(){S.txFilters={};['txfType','txfDateFrom','txfDateTo','txFilterClient','txfMin','txfMax'].forEach(function(id){document.getElementById(id).value=''});renderTxList()});
   document.getElementById('txSortSelect').addEventListener('change',function(){S.txSort=this.value;renderTxList()});
   document.getElementById('addTxBtn').addEventListener('click',function(){openTxForm()});
   document.getElementById('saveTxBtn').addEventListener('click',saveTx);

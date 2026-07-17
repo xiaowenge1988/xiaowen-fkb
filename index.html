@@ -701,7 +701,7 @@ ul{list-style:none}
           <div class="filter-group"><label>成交类型</label><select id="txfType"><option value="">全部</option><option value="newdev">新房</option><option value="secondhand">二手房</option><option value="other">其他</option></select></div>
           <div class="filter-group"><label>开始日期</label><input type="date" id="txfDateFrom"></div>
           <div class="filter-group"><label>结束日期</label><input type="date" id="txfDateTo"></div>
-          <div class="filter-group"><label>客户姓名</label><input type="text" id="txfClient" placeholder="输入客户名"></div>
+          <div class="filter-group"><label>客户姓名</label><input type="text" id="txFilterClient" placeholder="输入客户名"></div>
           <div class="filter-group"><label>价格下限（万）</label><input type="number" id="txfMin" placeholder="0" min="0"></div>
           <div class="filter-group"><label>价格上限（万）</label><input type="number" id="txfMax" placeholder="不限" min="0"></div>
         </div>
@@ -925,6 +925,7 @@ ul{list-style:none}
             <div class="form-field"><label>成交客户 <span class="req">*</span></label><select id="txfClient"><option value="">请选择客户</option></select></div>
             <div class="form-field"><label>成交房源</label><select id="txfProperty"><option value="">选择已有房源</option></select></div>
           </div>
+          <div class="form-field"><label>或手动输入客户姓名</label><input type="text" id="txfClientName" placeholder="如不选已有客户，可手动输入"></div>
           <div class="form-field"><label>或手动输入房源名称</label><input type="text" id="txfPropName" placeholder="如不选已有房源，可手动输入"></div>
           <div class="form-row">
             <div class="form-field"><label>成交类型 <span class="req">*</span></label><select id="txfDealType"><option value="secondhand">二手房</option><option value="newdev">新房</option><option value="other">其他</option></select></div>
