@@ -1,0 +1,12 @@
+{
+  "name": "xiao-wen-fang-ke-bao",
+  "version": "6.0.0",
+  "description": "小闻房客宝 - 客户房源成交管理系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
