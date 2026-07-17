@@ -1764,8 +1764,8 @@ function setupHandlers(){
     S.filterCreatedBy=this.value;
     renderClientList();
   });
-  document.getElementById('lockPassword').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();if(document.getElementById('lockPwConfirmGroup').style.display!=='none'){document.getElementById('lockPasswordConfirm').focus()}else{tryUnlock()}}});
-  document.getElementById('lockPasswordConfirm').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();tryUnlock()}});
+  document.getElementById('lockPassword').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();if(document.getElementById('lockPwConfirmGroup').style.display!=='none'){document.getElementById('lockPasswordConfirm').focus()}else{tryAuth()}}});
+  document.getElementById('lockPasswordConfirm').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();tryAuth()}});
   // Settings: password & user management
   document.getElementById('changePasswordBtn').addEventListener('click',function(){closeModal('settingsModal');document.getElementById('pwOld').value='';document.getElementById('pwNew').value='';document.getElementById('pwNewConfirm').value='';document.getElementById('pwChangeModal').classList.add('show')});
   document.getElementById('userManageBtn').addEventListener('click',function(){closeModal('settingsModal');document.getElementById('userMgmtModal').classList.add('show')});
@@ -1857,6 +1857,7 @@ function init(){
   if(!token){
     // 没有token，显示登录页
     MediaDB.init().then(function(){
+      setupHandlers();
       showLoginScreen();
     });
     return;
@@ -1903,6 +1904,7 @@ function init(){
       // token无效或服务器不可用
       localStorage.removeItem(SK_AUTH);
       MediaDB.init().then(function(){
+        setupHandlers();
         showLoginScreen();
       });
     }

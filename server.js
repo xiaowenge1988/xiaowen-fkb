@@ -250,6 +250,7 @@ async function handleApi(req, res, pathname, method) {
       var updateData = JSON.parse(await readBody(req));
       db.users = (db.users || []).map(function(u) {
         if (u.id === userId2) {
+          if (updateData.username) u.username = updateData.username;
           if (updateData.active !== undefined) u.active = updateData.active;
           if (updateData.password) u.password = hashPw(updateData.password);
           if (updateData.name) u.name = updateData.name;
