@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.workbuddy
+*.md
+data/db.json
+data/media/*
+!data/media/.gitkeep
