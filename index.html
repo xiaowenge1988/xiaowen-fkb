@@ -425,6 +425,7 @@ ul{list-style:none}
 }
 @media(min-width:1024px){
   .fab{display:none}
+  .toast{bottom:24px}
 }
 
 /* ===== Password Lock Screen ===== */
@@ -508,6 +509,38 @@ ul{list-style:none}
 .brand-logo .logo-icon img{width:100%;height:100%;object-fit:cover;border-radius:7px}
 .brand-logo .logo-text{font-size:1.0625rem;font-weight:700;white-space:nowrap}
 .brand-logo .logo-sub{font-size:.5625rem;opacity:.7;font-weight:400;margin-top:-1px}
+
+/* ===== Quick Followup (inline on card) ===== */
+.quick-followup{margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-100);display:none}
+.quick-followup.show{display:block}
+.quick-followup textarea{width:100%;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:6px 8px;font-size:.8125rem;outline:none;transition:.2s;min-height:44px;resize:vertical}
+.quick-followup textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
+.quick-followup-bar{display:flex;align-items:center;gap:6px;margin-top:6px}
+.quick-followup-bar select{flex:1;height:28px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 6px;font-size:.75rem;background:var(--gray-50)}
+
+/* ===== Filter Badge ===== */
+.filter-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:var(--primary);color:#fff;font-size:.625rem;font-weight:700;padding:0 5px;margin-left:6px}
+
+/* ===== Timeline relative date ===== */
+.timeline-date .rel-today{color:var(--danger);font-weight:600}
+.timeline-date .rel-recent{color:var(--warning)}
+
+/* ===== Sample data button ===== */
+.sample-btn{margin-top:12px;padding:8px 20px;border-radius:var(--radius-sm);background:var(--primary-light);color:var(--primary);font-size:.8125rem;font-weight:500;transition:.2s;border:1px solid var(--primary)}
+.sample-btn:hover{background:var(--primary);color:#fff}
+
+/* ===== Dashboard today task ===== */
+.today-task-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;transition:.2s;margin-bottom:4px;background:var(--gray-50)}
+.today-task-item:hover{background:var(--danger-light)}
+.today-task-item .tt-name{font-size:.8125rem;font-weight:500;flex:1}
+.today-task-item .tt-info{font-size:.6875rem;color:var(--text-muted)}
+.today-task-item .tt-badge{padding:1px 6px;border-radius:8px;font-size:.5625rem;font-weight:600;background:var(--danger);color:#fff}
+
+/* ===== Card followup relative time ===== */
+.followup-rel{font-weight:600}
+.followup-rel.overdue{color:var(--danger)}
+.followup-rel.recent{color:var(--warning)}
+.followup-rel.ok{color:var(--gray-500)}
 </style>
 </head>
 <body>

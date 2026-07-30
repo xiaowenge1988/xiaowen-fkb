@@ -343,8 +343,17 @@ function fmtDateTime(ts){if(!ts)return'—';var d=new Date(ts);return fmtDate(ts
 function fmtBudget(min,max){if(!min&&!max)return'不限';if(min&&max)return min+'-'+max+'万';if(min)return min+'万以上';return max+'万以下'}
 function esc(s){if(!s)return'';return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]})}
 function daysSince(ts){if(!ts)return 999;return Math.floor((Date.now()-ts)/86400000)}
+function relDate(ts){if(!ts)return'—';var d=daysSince(ts);if(d===0)return'今天';if(d===1)return'昨天';if(d<7)return d+'天前';if(d<30)return Math.floor(d/7)+'周前';return fmtDate(ts)}
+function tomorrowStr(){var d=new Date(Date.now()+86400000);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
 function lastFollowup(c){if(!c.followUps||!c.followUps.length)return null;var l=0;c.followUps.forEach(function(f){if(f.date>l)l=f.date});return l}
 function needFollowup(c){var l=lastFollowup(c)||c.updatedAt||c.createdAt;if(c.status==='已成交'||c.status==='暂缓')return false;return daysSince(l)>=7}
+function updateFilterBadge(toggleId,filters){
+  var toggle=document.getElementById(toggleId);if(!toggle)return;
+  var count=0;for(var k in filters){if(filters[k])count++}
+  var badge=toggle.querySelector('.filter-badge');
+  if(!badge){badge=document.createElement('span');badge.className='filter-badge';var span=toggle.querySelector('span');if(span)span.appendChild(badge)}
+  badge.textContent=count;badge.style.display=count>0?'inline-flex':'none';
+}
 function findClient(id){return S.clients.find(function(c){return c.id===id})}
 function findProp(id){return S.properties.find(function(p){return p.id===id})}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
@@ -478,11 +487,21 @@ function getFilteredClients(){
 /* ========== Client: List ========== */
 function renderClientList(){
   renderClientStats();
+  updateFilterBadge('filterToggle',S.filters);
   var list=getFilteredClients();
   var grid=document.getElementById('clientGrid');
   document.getElementById('resultCount').innerHTML='共 <b>'+list.length+'</b> 位客户';
   if(list.length===0){
-    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><h3>'+(S.clients.length===0?'还没有客户档案':'没有符合条件的客户')+'</h3><p>'+(S.clients.length===0?'点击右下角按钮，开始录入':'试试调整筛选条件')+'</p></div>';
+    var isEmptyAll=S.clients.length===0;
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><h3>'+(isEmptyAll?'还没有客户档案':'没有符合条件的客户')+'</h3><p>'+(isEmptyAll?'点击「新增客户」按钮录入，或加载示例数据体验功能':'试试调整筛选条件')+'</p>'+(isEmptyAll?'<button class="sample-btn" id="loadSampleBtn">加载示例数据</button>':'')+'</div>';
+    var lsb=document.getElementById('loadSampleBtn');
+    if(lsb)lsb.addEventListener('click',function(){
+      confirmDialog('加载示例数据','将导入5位客户+4套房源+2条成交记录作为演示数据，可随时清空。',function(){
+        S.clients=getSampleClients();S.properties=getSampleProperties();S.transactions=getSampleTransactions();
+        saveC();saveP();saveT();renderClientList();renderPropertyList();renderTxList();
+        toast('示例数据已加载','success');
+      });
+    });
     return;
   }
   grid.innerHTML=list.map(function(c){
@@ -493,6 +512,8 @@ function renderClientList(){
     if(c.unitType&&c.unitType!=='不限')tags+='<span class="client-tag">'+esc(c.unitType)+'</span>';
     if(c.targetAreas&&c.targetAreas.length)tags+='<span class="client-tag">'+esc(c.targetAreas.slice(0,2).join('·')+(c.targetAreas.length>2?'…':''))+'</span>';
     var mainPhone=(c.phones&&c.phones[0])?c.phones[0].number:'';
+    var followupRel=lf?relDate(lf):'未跟进';
+    var followupCls=nf?'overdue':(lf&&daysSince(lf)<3?'recent':'ok');
     return'<div class="client-card" data-grade="'+esc(c.grade)+'" data-id="'+c.id+'">'
       +(nf?'<div class="need-followup" title="需要跟进"></div>':'')
       +'<div class="client-card-top"><div><div class="client-name">'+esc(c.name)+' <span class="grade-badge" data-grade="'+esc(c.grade)+'">'+esc(c.grade)+'级</span></div>'
@@ -500,23 +521,54 @@ function renderClientList(){
       +'<span class="status-badge" data-status="'+esc(c.status)+'">'+esc(c.status)+'</span></div>'
       +(isAdmin()&&c.createdByName?'<div class="creator-badge" title="录入人">'+esc(c.createdByName)+'</div>':'')
       +(tags?'<div class="client-tags">'+tags+'</div>':'')
-      +'<div class="client-meta"><span>预算 <b>'+esc(fmtBudget(c.budgetMin,c.budgetMax))+'</b></span><span>来源 <b>'+esc(c.source||'—')+'</b></span><span>跟进 <b>'+(lf?fmtDate(lf):'未跟进')+'</b></span></div>'
+      +'<div class="client-meta"><span>预算 <b>'+esc(fmtBudget(c.budgetMin,c.budgetMax))+'</b></span><span>来源 <b>'+esc(c.source||'—')+'</b></span><span>跟进 <b class="followup-rel '+followupCls+'">'+followupRel+'</b></span></div>'
       +'<div class="card-actions">'
+      +'<button data-action="call" data-id="'+c.id+'">电话</button>'
+      +'<button data-action="quick-followup" data-id="'+c.id+'">跟进</button>'
       +'<button data-action="view" data-id="'+c.id+'">详情</button>'
-      +'<button data-action="followup" data-id="'+c.id+'">跟进</button>'
       +'<button data-action="edit" data-id="'+c.id+'">编辑</button>'
-      +'</div></div>';
+      +'</div>'
+      +'<div class="quick-followup" id="qf-'+c.id+'">'
+      +'<textarea id="qf-text-'+c.id+'" placeholder="输入本次跟进内容…" rows="2"></textarea>'
+      +'<div class="quick-followup-bar">'
+      +'<select id="qf-status-'+c.id+'"><option value="">不改状态</option><option>待联系</option><option>已联系</option><option>看房中</option><option>谈判中</option><option>已成交</option><option>暂缓</option></select>'
+      +'<button class="btn btn-primary btn-sm" data-action="save-quick-followup" data-id="'+c.id+'">提交</button>'
+      +'</div></div>'
+      +'</div>';
   }).join('');
   // Card click
   grid.querySelectorAll('.client-card').forEach(function(card){
-    card.addEventListener('click',function(e){if(e.target.closest('button')||e.target.closest('a'))return;showClientDetail(card.getAttribute('data-id'))});
+    card.addEventListener('click',function(e){if(e.target.closest('button')||e.target.closest('a')||e.target.closest('textarea')||e.target.closest('select'))return;showClientDetail(card.getAttribute('data-id'))});
   });
   grid.querySelectorAll('.card-actions button').forEach(function(btn){
     btn.addEventListener('click',function(e){
       e.stopPropagation();var a=btn.getAttribute('data-action'),id=btn.getAttribute('data-id');
       if(a==='view')showClientDetail(id);
       if(a==='edit')openClientForm(id);
-      if(a==='followup'){S.curClientId=id;showClientDetail(id);setTimeout(function(){var t=document.getElementById('followupText');if(t)t.focus()},300)}
+      if(a==='call'){
+        var c=findClient(id);if(!c||!c.phones||!c.phones.length)return;
+        window.location.href='tel:'+c.phones[0].number;
+      }
+      if(a==='quick-followup'){
+        var qf=document.getElementById('qf-'+id);
+        if(qf){
+          qf.classList.toggle('show');
+          if(qf.classList.contains('show')){
+            var ta=document.getElementById('qf-text-'+id);if(ta)setTimeout(function(){ta.focus()},50);
+            var sel=document.getElementById('qf-status-'+id);if(sel){sel.value='';var cl=findClient(id);if(cl)sel.value=cl.status}
+          }
+        }
+      }
+      if(a==='save-quick-followup'){
+        var text=document.getElementById('qf-text-'+id).value.trim();
+        if(!text){toast('请输入跟进内容','error');return}
+        var cl=findClient(id);if(!cl)return;
+        var newStatus=document.getElementById('qf-status-'+id).value;
+        if(!cl.followUps)cl.followUps=[];
+        cl.followUps.push({id:uuid(),content:text,date:now(),reminderDate:null});
+        if(newStatus&&newStatus!==cl.status){cl.status=newStatus}
+        cl.updatedAt=now();saveC();renderClientList();toast('跟进已记录','success');
+      }
     });
   });
 }
@@ -545,6 +597,7 @@ function openClientForm(id){
   S.editAreas=(c.targetAreas||[]).slice();
   renderPhoneList();renderTagChips();renderAreaCheckboxes();
   document.getElementById('clientFormModal').classList.add('show');
+  var cfMb=document.querySelector('#clientFormModal .modal-body');if(cfMb)cfMb.scrollTop=0;
 }
 function renderPhoneList(){
   document.getElementById('cfPhoneList').innerHTML=S.editPhones.map(function(p,i){
@@ -591,7 +644,7 @@ function saveClient(){
   syncPhonesToState();
   var phones=S.editPhones.filter(function(p){return p.number});
   if(phones.length===0){toast('请至少输入一个电话号码','error');return}
-  if(phones[0].number.length!==11||!/^1\d{10}$/.test(phones[0].number)){toast('请输入正确的手机号','error');return}
+  if(phones[0].number.replace(/[^0-9]/g,'').length<5){toast('请输入有效的电话号码','error');return}
   var id=document.getElementById('cfId').value;var isEdit=!!id;var c=isEdit?findClient(id):{};
   c.name=name;c.phones=phones;c.wechat=document.getElementById('cfWechat').value.trim();
   c.gender=document.getElementById('cfGender').value;c.source=document.getElementById('cfSource').value;
@@ -614,8 +667,10 @@ function showClientDetail(id){
   var phonesHtml=(c.phones||[]).map(function(p){return'<div style="font-size:.75rem;color:var(--text-muted)">'+esc(p.label)+': <a href="tel:'+esc(p.number)+'" style="color:var(--primary)">'+esc(p.number)+'</a></div>'}).join('');
   var tagsHtml=(c.customTags||[]).map(function(t){return'<span class="client-tag custom">'+esc(t)+'</span>'}).join('');
   var tlHtml=fups.length?fups.map(function(f){
+    var rd=daysSince(f.date);
+    var relCls=rd===0?'rel-today':(rd<=3?'rel-recent':'');
     var reminderTag=f.reminderDate?'<span class="reminder-tag">提醒:'+fmtDate(f.reminderDate)+'</span>':'';
-    return'<div class="timeline-item'+(f.reminderDate?' has-reminder':'')+'"><div class="timeline-date">'+fmtDateTime(f.date)+' '+reminderTag+'</div><div class="timeline-content">'+esc(f.content)+'</div></div>';
+    return'<div class="timeline-item'+(f.reminderDate?' has-reminder':'')+'"><div class="timeline-date"><span class="'+relCls+'">'+relDate(f.date)+'</span> · '+fmtDateTime(f.date)+' '+reminderTag+'</div><div class="timeline-content">'+esc(f.content)+'</div></div>';
   }).join(''):'<div class="timeline-empty">暂无跟进记录</div>';
   var viewingsHtml=(c.viewings||[]).map(function(v){
     return'<div class="viewing-item"><div class="vi-top"><span class="vi-prop">'+esc(v.propertyTitle||'未知房源')+'</span><span class="vi-date">'+fmtDate(v.date)+'</span></div>'+(v.feedback?'<div class="vi-feedback">'+esc(v.feedback)+'</div>':'')+'</div>';
@@ -653,7 +708,11 @@ function showClientDetail(id){
     +'<div class="detail-section"><h3>匹配房源推荐</h3><div>'+matchedHtml+'</div></div>';
   document.getElementById('clientDetailModal').classList.add('show');
   // Followup handler
-  document.getElementById('setReminder').addEventListener('change',function(){document.getElementById('reminderDate').style.display=this.checked?'':'none'});
+  document.getElementById('setReminder').addEventListener('change',function(){
+    var rd=document.getElementById('reminderDate');
+    rd.style.display=this.checked?'':'none';
+    if(this.checked&&!rd.value)rd.value=tomorrowStr();
+  });
   document.getElementById('addFollowupBtn').addEventListener('click',function(){
     var text=document.getElementById('followupText').value.trim();
     if(!text){toast('请输入跟进内容','error');return}
@@ -710,11 +769,12 @@ function getFilteredProperties(){
 
 /* ========== Property: List ========== */
 function renderPropertyList(){
+  updateFilterBadge('propFilterToggle',S.propFilters);
   var list=getFilteredProperties();
   var grid=document.getElementById('propertyGrid');
   document.getElementById('propResultCount').innerHTML='共 <b>'+list.length+'</b> 套房源';
   if(list.length===0){
-    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><h3>'+(S.properties.length===0?'还没有房源档案':'没有符合条件的房源')+'</h3><p>'+(S.properties.length===0?'点击右下角按钮，开始录入':'试试调整筛选条件')+'</p></div>';
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><h3>'+(S.properties.length===0?'还没有房源档案':'没有符合条件的房源')+'</h3><p>'+(S.properties.length===0?'点击「新增房源」按钮，开始录入':'试试调整筛选条件')+'</p></div>';
     return;
   }
   grid.innerHTML=list.map(function(p){
@@ -799,6 +859,7 @@ function openPropertyForm(id){
   renderPropTagChips();
   renderAreaSegments();
   document.getElementById('propFormModal').classList.add('show');
+  var pfMb=document.querySelector('#propFormModal .modal-body');if(pfMb)pfMb.scrollTop=0;
 }
 function updatePropFormFields(type){
   document.querySelectorAll('[data-show]').forEach(function(el){
@@ -1364,11 +1425,12 @@ function renderTxStats(){
 }
 function renderTxList(){
   renderTxStats();
+  updateFilterBadge('txFilterToggle',S.txFilters);
   var list=getFilteredTx();
   var grid=document.getElementById('txGrid');
   document.getElementById('txResultCount').innerHTML='共 <b>'+list.length+'</b> 条成交记录';
   if(list.length===0){
-    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><h3>'+(S.transactions.length===0?'还没有成交记录':'没有符合条件的记录')+'</h3><p>'+(S.transactions.length===0?'点击右上角按钮，录入第一笔成交':'试试调整筛选条件')+'</p></div>';
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><h3>'+(S.transactions.length===0?'还没有成交记录':'没有符合条件的记录')+'</h3><p>'+(S.transactions.length===0?'点击「录入成交」按钮，记录第一笔成交':'试试调整筛选条件')+'</p></div>';
     return;
   }
   var typeNames={newdev:'新房',secondhand:'二手房',other:'其他'};
@@ -1419,9 +1481,10 @@ function openTxForm(id){
   };
   clientSel.onchange=function(){
     var cid=this.value;
-    if(cid&&!document.getElementById('txfDate').value){/* keep date */}
+    if(cid){var c=findClient(cid);if(c)document.getElementById('txfClientName').value=c.name}
   };
   document.getElementById('txFormModal').classList.add('show');
+  var tfMb=document.querySelector('#txFormModal .modal-body');if(tfMb)tfMb.scrollTop=0;
 }
 function saveTx(){
   var clientId=document.getElementById('txfClient').value;
@@ -1517,21 +1580,39 @@ function renderDashboard(){
   var activities=[];
   S.clients.forEach(function(c){(c.followUps||[]).forEach(function(f){activities.push({time:f.date,text:'['+c.name+'] 跟进: '+f.content.slice(0,40)})});
     (c.viewings||[]).forEach(function(v){activities.push({time:v.date,text:'['+c.name+'] 带看: '+v.propertyTitle})})});
+  S.transactions.forEach(function(t){activities.push({time:t.createdAt||t.transactionDate,text:'[成交] '+t.clientName+' · '+t.propertyTitle+' · '+(t.transactionPrice||0)+'万'})});
   activities.sort(function(a,b){return b.time-a.time});
   var actHtml=activities.slice(0,10).map(function(a){return'<div class="activity-item"><span class="a-time">'+fmtDate(a.time)+'</span><span class="a-text">'+esc(a.text)+'</span></div>'}).join('')||'<div class="timeline-empty">暂无活动</div>';
-  // Reminders
+  // Reminders (clickable)
   var reminderHtml=S.dueReminders.map(function(r){
-    return'<div class="activity-item"><span class="a-time" style="color:var(--danger)">'+fmtDate(r.followup.reminderDate)+'</span><span class="a-text">['+esc(r.client.name)+'] '+esc(r.followup.content.slice(0,30))+'</span></div>';
+    return'<div class="activity-item" style="cursor:pointer" data-dash-client="'+r.client.id+'"><span class="a-time" style="color:var(--danger)">'+fmtDate(r.followup.reminderDate)+'</span><span class="a-text">['+esc(r.client.name)+'] '+esc(r.followup.content.slice(0,30))+'</span></div>';
   }).join('')||'<div class="timeline-empty">暂无待提醒事项</div>';
+  // Today tasks (clients needing follow-up)
+  var todayTasks=S.clients.filter(function(c){return needFollowup(c)}).sort(function(a,b){
+    var la=lastFollowup(a)||a.updatedAt||0;var lb=lastFollowup(b)||b.updatedAt||0;return la-lb;
+  });
+  var todayHtml=todayTasks.slice(0,8).map(function(c){
+    var lf=lastFollowup(c);var days=lf?daysSince(lf):999;
+    return'<div class="today-task-item" data-dash-client="'+c.id+'"><span class="tt-name">'+esc(c.name)+'</span><span class="tt-info">'+esc(c.grade)+'级 · '+(lf?relDate(lf):'未跟进')+'</span><span class="tt-badge">需跟进</span></div>';
+  }).join('')||'<div class="timeline-empty">暂无需要跟进的客户</div>';
   document.getElementById('dashboardContent').innerHTML=
     '<div class="dash-card"><h3>📊 数据概览</h3><div class="dash-stats"><div class="dash-stat"><div class="num" style="color:var(--primary)">'+totalC+'</div><div class="lbl">总客户</div></div><div class="dash-stat"><div class="num" style="color:var(--danger)">'+gA+'</div><div class="lbl">A级客户</div></div><div class="dash-stat"><div class="num" style="color:var(--success)">'+closed+'</div><div class="lbl">已成交</div></div><div class="dash-stat"><div class="num" style="color:var(--teal)">'+totalP+'</div><div class="lbl">总房源</div></div><div class="dash-stat"><div class="num" style="color:var(--purple)">'+totalT+'</div><div class="lbl">成交记录</div></div></div></div>'
     +'<div class="dash-card"><h3>💰 成交统计</h3><div class="dash-stats"><div class="dash-stat"><div class="num" style="color:var(--danger)">'+totalVol.toFixed(0)+'</div><div class="lbl">成交总额(万)</div></div><div class="dash-stat"><div class="num" style="color:var(--warning)">'+totalComm.toFixed(0)+'</div><div class="lbl">佣金收入(元)</div></div><div class="dash-stat"><div class="num" style="color:var(--purple)">'+txByType.newdev+'</div><div class="lbl">新房成交</div></div><div class="dash-stat"><div class="num" style="color:var(--primary)">'+txByType.secondhand+'</div><div class="lbl">二手成交</div></div></div></div>'
+    +'<div class="dash-card"><h3>📋 今日待办（需跟进客户）</h3>'+todayHtml+'</div>'
     +'<div class="dash-card"><h3>🔥 客户成交漏斗</h3><div class="funnel">'+funnelHtml+'</div></div>'
     +'<div class="dash-card"><h3>📥 客户来源分布</h3><div class="bar-chart">'+srcHtml+'</div></div>'
     +'<div class="dash-card"><h3>⭐ 客户等级分布</h3><div class="bar-chart">'+gradeHtml+'</div></div>'
     +'<div class="dash-card"><h3>🏠 房源统计</h3><div class="detail-grid">'+di('在售/待售',onSale)+di('二手房',S.properties.filter(function(p){return p.type==='secondhand'}).length)+di('新楼盘',S.properties.filter(function(p){return p.type==='newdev'}).length)+di('总房源',totalP)+'</div></div>'
     +'<div class="dash-card"><h3>⏰ 待提醒跟进</h3>'+reminderHtml+'</div>'
     +'<div class="dash-card"><h3>📝 最近活动</h3>'+actHtml+'</div>';
+  // Click handlers for dashboard items
+  document.querySelectorAll('[data-dash-client]').forEach(function(el){
+    el.addEventListener('click',function(){
+      var cid=el.getAttribute('data-dash-client');
+      switchTab('clients');
+      setTimeout(function(){showClientDetail(cid)},200);
+    });
+  });
 }
 
 /* ========== Reminders ========== */
@@ -1616,15 +1697,15 @@ function setupHandlers(){
   })});
   document.querySelectorAll('.subtab').forEach(function(t){t.addEventListener('click',function(){switchSubtab(t.getAttribute('data-subtab'))})});
   // Search - desktop
-  var st;document.getElementById('searchInput').addEventListener('input',function(){clearTimeout(st);var v=this.value;st=setTimeout(function(){S.search=v;if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList()},200)});
+  var st;document.getElementById('searchInput').addEventListener('input',function(){clearTimeout(st);var v=this.value;st=setTimeout(function(){S.search=v;if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList();if(S.tab==='transactions')renderTxList()},200)});
   // Search - mobile
   var stm;var searchInputMobile=document.getElementById('searchInputMobile');
-  if(searchInputMobile)searchInputMobile.addEventListener('input',function(){clearTimeout(stm);var v=this.value;stm=setTimeout(function(){S.search=v;if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList()},200)});
+  if(searchInputMobile)searchInputMobile.addEventListener('input',function(){clearTimeout(stm);var v=this.value;stm=setTimeout(function(){S.search=v;if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList();if(S.tab==='transactions')renderTxList()},200)});
   // Mobile search toggle
   var mobileSearchBtn=document.getElementById('mobileSearchBtn');
   if(mobileSearchBtn)mobileSearchBtn.addEventListener('click',function(){document.getElementById('mobileSearchOverlay').style.display='flex';document.getElementById('searchInputMobile').focus()});
   var closeMobileSearch=document.getElementById('closeMobileSearch');
-  if(closeMobileSearch)closeMobileSearch.addEventListener('click',function(){document.getElementById('mobileSearchOverlay').style.display='none';document.getElementById('searchInputMobile').value='';S.search='';if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList()});
+  if(closeMobileSearch)closeMobileSearch.addEventListener('click',function(){document.getElementById('mobileSearchOverlay').style.display='none';document.getElementById('searchInputMobile').value='';S.search='';if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList();if(S.tab==='transactions')renderTxList()});
   // Filter toggle
   var fo=false;document.getElementById('filterToggle').addEventListener('click',function(){fo=!fo;this.classList.toggle('open',fo);document.getElementById('filterBody').classList.toggle('open',fo)});
   var pfo=false;document.getElementById('propFilterToggle').addEventListener('click',function(){pfo=!pfo;this.classList.toggle('open',pfo);document.getElementById('propFilterBody').classList.toggle('open',pfo)});
