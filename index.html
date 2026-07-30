@@ -606,6 +606,29 @@ ul{list-style:none}
 .client-table .ct-grade-B{background:linear-gradient(135deg,#3b82f6,#6366f1)}
 .client-table .ct-grade-C{background:linear-gradient(135deg,#94a3b8,#64748b)}
 .client-table .ct-pinned{box-shadow:inset 3px 0 0 var(--warning)}
+/* Grade-based row colors */
+.client-table tbody tr.grade-a td{background:rgba(239,68,68,.035)}
+.client-table tbody tr.grade-a td:first-child{border-left:3px solid #ef4444}
+.client-table tbody tr.grade-a:hover td{background:rgba(239,68,68,.08)}
+.client-table tbody tr.grade-b td{background:rgba(59,130,246,.035)}
+.client-table tbody tr.grade-b td:first-child{border-left:3px solid #3b82f6}
+.client-table tbody tr.grade-b:hover td{background:rgba(59,130,246,.08)}
+.client-table tbody tr.grade-c td:first-child{border-left:3px solid #cbd5e1}
+/* Pinned (重点) overrides grade border+bg */
+.client-table tbody tr.is-pinned td:first-child{border-left:3px solid var(--warning)}
+.client-table tbody tr.is-pinned td{background:rgba(245,158,11,.05)}
+.client-table tbody tr.is-pinned:hover td{background:rgba(245,158,11,.1)}
+/* Completed (已成交) overrides grade/pinned bg */
+.client-table tbody tr.is-completed td{background:rgba(34,197,94,.06)}
+.client-table tbody tr.is-completed:hover td{background:rgba(34,197,94,.1)}
+/* Inactive overrides all (existing .invalid class handles this) */
+.client-table tbody tr.invalid td:first-child{border-left:3px solid var(--gray-300)}
+/* Card view grade colors */
+.client-card[data-grade="A"]{border-left-color:#ef4444}
+.client-card[data-grade="B"]{border-left-color:#3b82f6}
+.client-card[data-grade="C"]{border-left-color:var(--gray-300)}
+/* Property card pinned */
+.property-card.pinned{border-top:3px solid var(--warning);box-shadow:0 0 0 1px rgba(245,158,11,.3),var(--shadow)}
 .client-table .empty-row td{text-align:center;padding:40px;color:var(--text-muted)}
 .client-table .ct-checkbox{width:14px;height:14px;cursor:pointer}
 

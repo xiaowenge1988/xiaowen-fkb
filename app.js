@@ -12,7 +12,7 @@ var S={
   sort:'updatedAt', propSort:'updatedAt', txSort:'transactionDate', tab:'clients', subtab:'secondhand',
   curClientId:null, curPropId:null, curTxId:null, editClientId:null, editPropId:null, editTxId:null,
   editTags:[], editPhones:[], editAreas:[], editPropTags:[], editAreaSegs:[],
-  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:'', smartClients:[], clientView:'card', pinnedIds:[], propViewMode:'card', smartProps:[]
+  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:'', smartClients:[], clientView:'card', pinnedIds:[], propViewMode:'card', smartProps:[], pinnedPropIds:[]
 };
 
 /* ========== Storage (本地缓存 + 云端同步) ========== */
@@ -628,7 +628,11 @@ function renderClientTable(){
     var inactive=c.status==='暂缓'||c.status==='已流失';
     var completed=c.status==='已成交';
 
-    html+='<tr data-id="'+c.id+'"'+(pinned?' class="ct-pinned"':'')+(inactive?' class="invalid"':'')+(completed?' style="background:#f0fdf4"':'')+'>'
+    var rowCls=['grade-'+((c.grade||'C')).toLowerCase()];
+    if(pinned)rowCls.push('is-pinned');
+    if(inactive)rowCls.push('invalid');
+    if(completed)rowCls.push('is-completed');
+    html+='<tr data-id="'+c.id+'" class="'+rowCls.join(' ')+'">'
       +'<td>'+(pinned?'<span title="重点关注" style="color:var(--warning)">⭐</span>':'<span style="color:var(--gray-300)">☆</span>')+'</td>'
       +'<td><span class="ct-grade-'+esc(c.grade)+'" title="'+esc(c.grade)+'级">'+esc(c.grade||'?')+'</span></td>'
       +'<td><span class="ct-name" title="'+esc(c.name||'')+'">'+esc(c.name||'未命名')+'</span>'
@@ -2060,13 +2064,15 @@ function renderPropertyList(){
     var price=p.type==='secondhand'?(p.totalPrice?p.totalPrice+'<span class="unit">万</span>':'面议'):(p.averagePrice?p.averagePrice+'<span class="unit">元/㎡</span>':'面议');
     var info=p.type==='secondhand'?[p.area?p.area+'㎡':'',p.layout||'',p.orientation||''].filter(Boolean):[p.developer||'',p.availableLayouts||''].filter(Boolean);
     var tags=(p.tags||[]).map(function(t){return'<span class="client-tag">'+esc(t)+'</span>'}).join('');
-    return'<div class="property-card" data-status="'+esc(p.status)+'" data-id="'+p.id+'">'
+    var propPinned=(S.pinnedPropIds||[]).indexOf(p.id)>=0;
+    return'<div class="property-card'+(propPinned?' pinned':'')+'" data-status="'+esc(p.status)+'" data-id="'+p.id+'">'
+      +(propPinned?'<div style="position:absolute;top:8px;right:8px;z-index:2;font-size:1rem">⭐</div>':'')
       +'<div class="card-thumb no-img" data-thumb="'+p.id+'"><span class="type-label">'+(p.type==='secondhand'?'二手房':'新楼盘')+'</span><span class="media-count" data-media-count="'+p.id+'" style="display:none"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="mc-num">0</span></span></div>'
       +'<div class="card-body"><div class="card-title">'+esc(p.title)+'</div><div class="card-price">'+price+'</div>'
       +'<div class="card-info">'+info.map(function(i){return'<span>'+esc(i)+'</span>'}).join('')+'</div>'
       +(tags?'<div class="prop-tags">'+tags+'</div>':'')
       +'<div class="card-info"><span>'+esc(p.district||'')+'</span><span class="status-badge" data-status="'+esc(p.status)+'">'+esc(p.status)+'</span></div>'
-      +'<div class="card-actions"><button data-action="pview" data-id="'+p.id+'">详情</button><button data-action="pshare" data-id="'+p.id+'">分享</button><button data-action="pedit" data-id="'+p.id+'">编辑</button></div>'
+      +'<div class="card-actions"><button data-action="pview" data-id="'+p.id+'">详情</button><button data-action="pshare" data-id="'+p.id+'">分享</button><button data-action="ppin" data-id="'+p.id+'" title="'+(propPinned?'取消重点':'标为重点')+'">'+(propPinned?'⭐取消':'⭐重点')+'</button><button data-action="pedit" data-id="'+p.id+'">编辑</button></div>'
       +'</div></div>';
   }).join('');
   grid.querySelectorAll('.property-card').forEach(function(card){
@@ -2078,6 +2084,14 @@ function renderPropertyList(){
       if(a==='pview')showPropertyDetail(id);
       if(a==='pedit')openPropertyForm(id);
       if(a==='pshare')copyPropertyInfo(id);
+      if(a==='ppin'){
+        S.pinnedPropIds=S.pinnedPropIds||[];
+        var idx=S.pinnedPropIds.indexOf(id);
+        if(idx>=0)S.pinnedPropIds.splice(idx,1);
+        else S.pinnedPropIds.push(id);
+        renderPropertyList();
+        toast(idx>=0?'已取消重点房源':'已标为重点房源','success');
+      }
     });
   });
   // Async load thumbnails
@@ -2133,8 +2147,13 @@ function renderPropertyTable(){
     var decoOrient=[p.orientation||'',p.decoration||''].filter(Boolean).join(' ');
     var areaStr=p.area?p.area+'㎡':'—';
 
-    html+='<tr data-id="'+p.id+'"'+(isSold?' style="background:#f0fdf4"':'')+(isOff?' class="invalid"':'')+'>'
-      +'<td>'+(isSold?'<span title="已售" style="color:var(--success)">✓</span>':'')+'</td>'
+    var propPinned=(S.pinnedPropIds||[]).indexOf(p.id)>=0;
+    var propRowCls=[];
+    if(propPinned)propRowCls.push('is-pinned');
+    if(isOff)propRowCls.push('invalid');
+    if(isSold)propRowCls.push('is-completed');
+    html+='<tr data-id="'+p.id+'"'+(propRowCls.length?' class="'+propRowCls.join(' ')+'"':'')+'>'
+      +'<td>'+(propPinned?'<span title="重点房源" style="color:var(--warning)">⭐</span>':'<span style="color:var(--gray-300)">☆</span>')+'</td>'
       +'<td><span style="font-size:.625rem;padding:1px 4px;border-radius:3px;background:'+(p.type==='secondhand'?'#fef3c7':'#dbeafe')+';color:'+(p.type==='secondhand'?'#92400e':'#1e40af')+'">'+(p.type==='secondhand'?'二手':'新房')+'</span></td>'
       +'<td><span class="ct-name" title="'+esc(p.title||'')+'">'+esc(p.title||'')+'</span>'
       +(p.community?'<div style="font-size:.625rem;color:var(--text-muted)">'+esc(p.community)+'</div>':'')
@@ -2159,6 +2178,7 @@ function renderPropertyTable(){
       +'<td>'+(tagsHtml||'<span style="color:var(--gray-400)">—</span>')+'</td>'
       +'<td><span class="ct-time">'+esc(fmtDate(p.createdAt))+'</span></td>'
       +'<td>'
+      +'<button class="ct-action-btn" data-prop-pin-id="'+p.id+'" title="'+(propPinned?'取消重点':'标为重点')+'">'+(propPinned?'⭐':'☆')+'</button>'
       +'<button class="ct-action-btn" data-prop-view-id="'+p.id+'" title="详情">详情</button>'
       +'<button class="ct-action-btn" data-prop-edit-id="'+p.id+'" title="编辑">编辑</button>'
       +'</td>'
@@ -2181,6 +2201,21 @@ function renderPropertyTable(){
       toast('已更新为：'+newStatus,'success');
     });
     sel.addEventListener('click',function(e){e.stopPropagation()});
+  });
+
+  /* pin/unpin */
+  table.querySelectorAll('[data-prop-pin-id]').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var id=btn.getAttribute('data-prop-pin-id');
+      S.pinnedPropIds=S.pinnedPropIds||[];
+      var idx=S.pinnedPropIds.indexOf(id);
+      if(idx>=0)S.pinnedPropIds.splice(idx,1);
+      else S.pinnedPropIds.push(id);
+      renderPropertyTable();
+      renderPropertyList();
+      toast(idx>=0?'已取消重点房源':'已标为重点房源','success');
+    });
   });
 
   /* view detail */
