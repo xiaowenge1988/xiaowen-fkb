@@ -97,8 +97,8 @@ ul{list-style:none}
 .filter-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;font-size:.8125rem;font-weight:600;color:var(--gray-700)}
 .filter-toggle .arrow{transition:.3s}
 .filter-toggle.open .arrow{transform:rotate(180deg)}
-.filter-body{overflow:hidden;max-height:0;transition:max-height .3s ease}
-.filter-body.open{max-height:600px}
+.filter-body{overflow:hidden;max-height:0;transition:max-height .4s ease}
+.filter-body.open{max-height:2000px}
 .filter-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .filter-group{display:flex;flex-direction:column;gap:3px;min-width:130px;flex:1}
 .filter-group label{font-size:.6875rem;color:var(--text-muted);font-weight:500}
@@ -307,6 +307,10 @@ ul{list-style:none}
 .media-item .media-type{position:absolute;top:3px;left:3px;padding:1px 5px;border-radius:3px;font-size:.5625rem;color:#fff;background:rgba(0,0,0,.55)}
 .media-item .media-delete{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;opacity:0;transition:.2s}
 .media-item:hover .media-delete{opacity:1}
+.media-item .media-set-cover{position:absolute;bottom:3px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;opacity:0;transition:.2s}
+.media-item:hover .media-set-cover{opacity:1}
+.media-item.is-cover{outline:2px solid var(--primary);outline-offset:-2px}
+.media-item .media-cover-badge{position:absolute;top:3px;left:3px;padding:1px 5px;border-radius:3px;font-size:.5625rem;color:#fff;background:var(--primary);font-weight:600}
 
 /* ===== Lightbox ===== */
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:400;display:none;align-items:center;justify-content:center;padding:20px}
@@ -544,7 +548,32 @@ ul{list-style:none}
 .sig-tag{background:var(--primary-light);color:var(--primary);font-weight:600;padding:1px 6px;border-radius:4px;font-size:.625rem}
 .smart-input-textarea{width:100%;min-height:160px;resize:vertical;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:10px 12px;font-size:.8125rem;line-height:1.6;outline:none;transition:.2s;font-family:inherit}
 .smart-input-textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
-.smart-input-actions{display:flex;align-items:center;gap:8px;margin-top:10px}
+.smart-input-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.smart-file-picker{display:flex;gap:6px;align-items:center}
+.smart-file-picker input[type=file]{display:none}
+.smart-file-picker label,.smart-link-btn{cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-size:.75rem;font-weight:500;transition:.2s}
+.smart-file-picker label:hover,.smart-link-btn:hover{background:var(--primary-light);color:var(--primary);border-color:var(--primary)}
+.link-parse-result{margin-top:10px;padding:10px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-size:.75rem}
+.link-parse-result .lpr-title{font-weight:600;color:var(--text-primary);margin-bottom:4px}
+.link-parse-result .lpr-desc{color:var(--text-secondary);font-size:.6875rem;line-height:1.5;margin-bottom:4px;max-height:80px;overflow:auto}
+.link-parse-result .lpr-meta{color:var(--text-muted);font-size:.625rem}
+.link-parse-result .lpr-thumb{max-width:120px;max-height:80px;border-radius:4px;margin-top:6px;object-fit:cover}
+.cover-picker{margin-top:8px;padding:8px;background:var(--gray-50);border:1px dashed var(--gray-300);border-radius:var(--radius-sm)}
+.cover-picker .cp-label{font-size:.6875rem;color:var(--text-muted);font-weight:500;margin-bottom:6px}
+.cover-picker .cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px;max-height:140px;overflow:auto}
+.cover-picker .cp-item{position:relative;aspect-ratio:1;border-radius:4px;overflow:hidden;cursor:pointer;border:2px solid transparent;transition:.2s}
+.cover-picker .cp-item:hover{border-color:var(--primary)}
+.cover-picker .cp-item.active{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
+.cover-picker .cp-item img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-picker .cp-item .cp-check{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;opacity:0;transition:.2s}
+.cover-picker .cp-item.active .cp-check{opacity:1;background:var(--primary)}
+.cover-picker .cp-empty{padding:20px;text-align:center;color:var(--text-muted);font-size:.75rem;grid-column:1/-1}
+.smart-link-input{margin-top:12px;padding:10px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-sm)}
+.smart-link-input .sli-label{font-size:.75rem;color:var(--text-secondary);font-weight:500;margin-bottom:6px}
+.smart-link-input .sli-row{display:flex;gap:6px;align-items:center}
+.smart-link-input .sli-row input{flex:1;height:32px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:0 8px;background:#fff;font-size:.8125rem;outline:none}
+.smart-link-input .sli-row input:focus{border-color:var(--primary)}
+.smart-link-input .sli-row button{padding:0 12px;height:32px;font-size:.75rem;white-space:nowrap}
 .smart-hint{font-size:.6875rem;color:var(--text-muted)}
 .smart-file-upload{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 0}
 .sfu-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--primary-light);color:var(--primary);border:1px dashed var(--primary);border-radius:var(--radius-sm);font-size:.6875rem;cursor:pointer;transition:.15s}
@@ -756,14 +785,23 @@ ul{list-style:none}
       <div class="filter-body" id="filterBody">
         <div class="filter-row">
           <div class="filter-group"><label>客户等级</label><select id="fGrade"><option value="">全部</option><option value="A">A · 高意向</option><option value="B">B · 中意向</option><option value="C">C · 低意向</option></select></div>
-          <div class="filter-group"><label>当前状态</label><select id="fStatus"><option value="">全部</option><option>待联系</option><option>已联系</option><option>看房中</option><option>谈判中</option><option>已成交</option><option>暂缓</option></select></div>
+          <div class="filter-group"><label>当前状态</label><select id="fStatus"><option value="">全部</option><option>待联系</option><option>已联系</option><option>看房中</option><option>谈判中</option><option>已成交</option><option>暂缓</option><option>已流失</option></select></div>
           <div class="filter-group"><label>购房目的</label><select id="fPurpose"><option value="">全部</option><option>刚需</option><option>改善</option><option>投资</option><option>学区</option></select></div>
           <div class="filter-group"><label>客户来源</label><select id="fSource"><option value="">全部</option><option>自来客</option><option>转介绍</option><option>线上咨询</option><option>老客户回访</option><option>贝壳平台</option><option>抖音/视频号</option></select></div>
           <div class="filter-group"><label>目标区域</label><select id="fArea"><option value="">全部</option><option>临平</option><option>余杭</option><option>萧山</option><option>拱墅</option><option>西湖</option><option>上城</option><option>滨江</option><option>钱塘</option><option>富阳</option><option>临安</option></select></div>
-          <div class="filter-group"><label>预算下限（万）</label><input type="number" id="fBudgetMin" placeholder="0" min="0"></div>
-          <div class="filter-group"><label>预算上限（万）</label><input type="number" id="fBudgetMax" placeholder="不限" min="0"></div>
-          <div class="filter-group"><label>需要跟进</label><select id="fNeedFollow"><option value="">全部</option><option value="7">7天未跟进</option><option value="14">14天未跟进</option><option value="30">30天未跟进</option></select></div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-group"><label>预算下限(万)</label><input type="number" id="fBudgetMin" placeholder="0" min="0"></div>
+          <div class="filter-group"><label>预算上限(万)</label><input type="number" id="fBudgetMax" placeholder="不限" min="0"></div>
+          <div class="filter-group"><label>面积需求(㎡)</label><select id="fAreaSeg"><option value="">不限</option><option value="0-60">60以下</option><option value="60-90">60-90</option><option value="90-120">90-120</option><option value="120-150">120-150</option><option value="150-200">150-200</option><option value="200-9999">200以上</option></select></div>
+          <div class="filter-group"><label>户型需求</label><input type="text" id="fLayout" placeholder="如3室"></div>
+          <div class="filter-group"><label>跟进状态</label><select id="fNeedFollow"><option value="">全部</option><option value="overdue">逾期未跟进</option><option value="7">7天未跟进</option><option value="14">14天未跟进</option><option value="30">30天未跟进</option><option value="today">今日需跟进</option><option value="never">从未跟进</option></select></div>
+        </div>
+        <div class="filter-row">
           <div class="filter-group"><label>自定义标签</label><input type="text" id="fTag" placeholder="输入标签筛选"></div>
+          <div class="filter-group"><label>特殊标记</label><select id="fSpecial"><option value="">不限</option><option value="pinned">⭐ 重点客户</option><option value="hasReminder">有待办提醒</option><option value="noPhone">缺联系电话</option><option value="hasTransaction">有成交记录</option></select></div>
+          <div class="filter-group"><label>姓名/手机号</label><input type="text" id="fQuickSearch" placeholder="输入姓名或手机号"></div>
+          <div class="filter-group"><label>归属人</label><select id="fCreator"><option value="">全部</option></select></div>
           <div class="filter-group" id="creatorFilter" style="display:none"><label>录入人</label><select id="creatorFilterSelect"><option value="">全部</option></select></div>
         </div>
         <div class="filter-actions"><button class="btn-reset" id="filterReset">清除筛选</button></div>
@@ -804,12 +842,25 @@ ul{list-style:none}
       </button>
       <div class="filter-body" id="propFilterBody">
         <div class="filter-row">
-          <div class="filter-group"><label>区域</label><select id="pfArea"><option value="">全部</option><option>临平</option><option>余杭</option><option>萧山</option><option>拱墅</option><option>西湖</option><option>上城</option><option>滨江</option><option>钱塘</option><option>富阳</option><option>临安</option></select></div>
-          <div class="filter-group"><label>状态</label><select id="pfStatus"><option value="">全部</option><option>在售</option><option>已售</option><option>下架</option><option>待售</option><option>售罄</option></select></div>
-          <div class="filter-group"><label>价格下限（万）</label><input type="number" id="pfMin" placeholder="0" min="0"></div>
-          <div class="filter-group"><label>价格上限（万）</label><input type="number" id="pfMax" placeholder="不限" min="0"></div>
-          <div class="filter-group"><label>户型</label><input type="text" id="pfLayout" placeholder="如3室"></div>
-          <div class="filter-group"><label>标签</label><input type="text" id="pfTag" placeholder="输入标签"></div>
+          <div class="filter-group"><label>区域</label><select id="pfFilterArea"><option value="">全部</option><option>临平</option><option>余杭</option><option>萧山</option><option>拱墅</option><option>西湖</option><option>上城</option><option>滨江</option><option>钱塘</option><option>富阳</option><option>临安</option></select></div>
+          <div class="filter-group"><label>状态</label><select id="pfFilterStatus"><option value="">全部</option><option>在售</option><option>已售</option><option>下架</option><option>待售</option><option>售罄</option></select></div>
+          <div class="filter-group"><label>类型</label><select id="pfFilterType"><option value="">全部</option><option value="secondhand">二手房</option><option value="newdev">新楼盘</option></select></div>
+          <div class="filter-group"><label>小区/楼盘</label><input type="text" id="pfFilterCommunity" placeholder="输入小区名"></div>
+          <div class="filter-group"><label>面积段(㎡)</label><select id="pfFilterAreaSeg"><option value="">不限</option><option value="0-60">60以下</option><option value="60-90">60-90</option><option value="90-120">90-120</option><option value="120-150">120-150</option><option value="150-200">150-200</option><option value="200-9999">200以上</option></select></div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-group"><label>总价下限(万)</label><input type="number" id="pfFilterMin" placeholder="0" min="0"></div>
+          <div class="filter-group"><label>总价上限(万)</label><input type="number" id="pfFilterMax" placeholder="不限" min="0"></div>
+          <div class="filter-group"><label>单价段(元/㎡)</label><select id="pfFilterUnitPrice"><option value="">不限</option><option value="0-20000">2万以下</option><option value="20000-30000">2-3万</option><option value="30000-40000">3-4万</option><option value="40000-50000">4-5万</option><option value="50000-70000">5-7万</option><option value="70000-99999">7万以上</option></select></div>
+          <div class="filter-group"><label>装修</label><select id="pfFilterDecoration"><option value="">不限</option><option>精装</option><option>简装</option><option>毛坯</option><option>豪装</option></select></div>
+          <div class="filter-group"><label>朝向</label><select id="pfFilterOrientation"><option value="">不限</option><option>南北通透</option><option>朝南</option><option>东南</option><option>西南</option></select></div>
+        </div>
+        <div class="filter-row">
+          <div class="filter-group"><label>户型</label><input type="text" id="pfFilterLayout" placeholder="如3室"></div>
+          <div class="filter-group"><label>标签</label><input type="text" id="pfFilterTag" placeholder="输入标签"></div>
+          <div class="filter-group"><label>特色</label><select id="pfFilterSpecial"><option value="">不限</option><option value="hasKey">有钥匙</option><option value="hasOwner">有业主电话</option><option value="hasMedia">有图有视频</option><option value="pinned">⭐ 重点房源</option></select></div>
+          <div class="filter-group"><label>学区</label><input type="text" id="pfFilterSchool" placeholder="学区名称"></div>
+          <div class="filter-group"><label>地铁</label><input type="text" id="pfFilterMetro" placeholder="地铁线路"></div>
         </div>
         <div class="filter-actions"><button class="btn-reset" id="propFilterReset">清除筛选</button></div>
       </div>
@@ -978,6 +1029,14 @@ ul{list-style:none}
         <button class="btn btn-outline" id="smartClearBtn">清空</button>
         <span class="smart-hint" id="smartParseHint"></span>
       </div>
+      <div class="smart-link-input">
+        <div class="sli-label">📎 链接识别（视频/公众号/抖音/B站/小红书）</div>
+        <div class="sli-row">
+          <input type="text" id="smartLinkInput" placeholder="粘贴视频或文章链接，按回车识别…">
+          <button class="btn btn-primary" id="smartLinkParseBtn">识别</button>
+        </div>
+        <div id="smartLinkResult" class="link-parse-result" style="display:none"></div>
+      </div>
       <div id="smartPreviewWrap" style="display:none">
         <div class="smart-preview-header">
           <span class="spv-title">识别结果（可编辑）</span>
@@ -1060,6 +1119,7 @@ ul{list-style:none}
           </div>
           <div class="form-field"><label>房源标签</label><div class="tag-input-container" id="pfTagContainer"><input type="text" id="pfTagInput" placeholder="输入后回车添加，如：精装、学区房"></div></div>
           <div class="form-field"><label>房源描述</label><textarea id="pfDesc" placeholder="房源亮点、周边配套、交通等"></textarea></div>
+          <div class="form-field" id="pfCoverField" style="display:none"><label>封面头图</label><div class="cover-picker"><div class="cp-label">点击选择已上传的图片作为封面</div><div class="cp-grid" id="pfCoverGrid"></div><input type="hidden" id="pfCoverMediaId"></div></div>
         </div>
       </form>
     </div>
@@ -1094,6 +1154,14 @@ ul{list-style:none}
         <button class="btn btn-primary" id="smartPropParseBtn">识别数据</button>
         <button class="btn btn-outline" id="smartPropClearBtn">清空</button>
         <span class="smart-hint" id="smartPropParseHint"></span>
+      </div>
+      <div class="smart-link-input">
+        <div class="sli-label">📎 链接识别（楼盘视频/公众号文章/抖音/B站/小红书）</div>
+        <div class="sli-row">
+          <input type="text" id="smartPropLinkInput" placeholder="粘贴楼盘相关视频或公众号文章链接，按回车识别…">
+          <button class="btn btn-primary" id="smartPropLinkParseBtn">识别</button>
+        </div>
+        <div id="smartPropLinkResult" class="link-parse-result" style="display:none"></div>
       </div>
       <div id="smartPropPreviewWrap" style="display:none">
         <div class="smart-preview-header">
