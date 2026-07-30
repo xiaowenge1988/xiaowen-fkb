@@ -1300,7 +1300,7 @@ function showShareView(id){
       +'<div class="share-body">'+(firstImg?'<img class="share-img" src="'+firstImg.dataUrl+'">':'')
       +rowsHtml
       +(p.description?'<div class="share-desc">'+esc(p.description)+'</div>':'')
-      +'</div><div class="share-footer">小闻房客宝 · '+(S.currentUser?S.currentUser.name:'小闻哥')+(S.currentUser&&S.currentUser.phone?' '+S.currentUser.phone:'')+'</div></div>';
+      +'</div><div class="share-footer">档案卡 · '+(S.currentUser?S.currentUser.name:'小闻哥')+(S.currentUser&&S.currentUser.phone?' '+S.currentUser.phone:'')+'</div></div>';
     document.getElementById('shareModal').classList.add('show');
   });
 }
@@ -1556,7 +1556,7 @@ function checkReminders(){
 function exportJSON(){
   var data=JSON.stringify({clients:S.clients,properties:S.properties,transactions:S.transactions,version:3},null,2);
   var blob=new Blob([data],{type:'application/json'});
-  downloadBlob(blob,'小闻房客宝备份_'+fmtDate(now()).replace(/-/g,'')+'.json');
+  downloadBlob(blob,'档案卡备份_'+fmtDate(now()).replace(/-/g,'')+'.json');
   toast('备份文件已导出','success');
 }
 function exportCSV(){

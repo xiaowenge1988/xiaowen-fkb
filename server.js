@@ -1,5 +1,5 @@
 /**
- * 小闻房客宝 v6.0 - 后端服务
+ * 档案卡 v6.0 - 后端服务
  * 多用户系统 + 数据隔离 + 媒体管理
  * 零依赖 Node.js HTTP 服务器
  */
@@ -135,7 +135,7 @@ async function handleApi(req, res, pathname, method) {
   /* --- 健康检查 --- */
   if (pathname === '/api/health' && method === 'GET') {
     sendJson(res, 200, {
-      ok: true, service: '小闻房客宝', version: '6.0',
+      ok: true, service: '档案卡', version: '6.0',
       users: (db.users || []).length,
       clients: (db.clients || []).length,
       properties: (db.properties || []).length,
@@ -440,7 +440,7 @@ var server = http.createServer(function(req, res) {
 server.listen(PORT, function() {
   console.log('');
   console.log('  ╔═══════════════════════════════════════╗');
-  console.log('  ║   小闻房客宝 v6.0 多用户版已启动！     ║');
+  console.log('  ║   档案卡 v6.0 多用户版已启动！           ║');
   console.log('  ╚═══════════════════════════════════════╝');
   console.log('');
   console.log('  电脑访问:  http://localhost:' + PORT);
