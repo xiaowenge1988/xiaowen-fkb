@@ -12,7 +12,7 @@ var S={
   sort:'updatedAt', propSort:'updatedAt', txSort:'transactionDate', tab:'clients', subtab:'secondhand',
   curClientId:null, curPropId:null, curTxId:null, editClientId:null, editPropId:null, editTxId:null,
   editTags:[], editPhones:[], editAreas:[], editPropTags:[], editAreaSegs:[],
-  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:'', smartClients:[]
+  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:'', smartClients:[], clientView:'card', pinnedIds:[]
 };
 
 /* ========== Storage (本地缓存 + 云端同步) ========== */
@@ -488,8 +488,17 @@ function getFilteredClients(){
 function renderClientList(){
   renderClientStats();
   updateFilterBadge('filterToggle',S.filters);
-  var list=getFilteredClients();
   var grid=document.getElementById('clientGrid');
+  var table=document.getElementById('clientTable');
+  if(S.clientView==='table'){
+    grid.style.display='none';
+    table.style.display='';
+    renderClientTable();
+    return;
+  }
+  grid.style.display='';
+  table.style.display='none';
+  var list=getFilteredClients();
   document.getElementById('resultCount').innerHTML='共 <b>'+list.length+'</b> 位客户';
   if(list.length===0){
     var isEmptyAll=S.clients.length===0;
@@ -571,6 +580,168 @@ function renderClientList(){
       }
     });
   });
+}
+
+function renderClientTable(){
+  var list=getFilteredClients();
+  var table=document.getElementById('clientTable');
+  document.getElementById('resultCount').innerHTML='共 <b>'+list.length+'</b> 位客户';
+
+  if(list.length===0){
+    var isEmptyAll=S.clients.length===0;
+    table.innerHTML='<div class="empty" style="padding:40px"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><h3>'+(isEmptyAll?'还没有客户档案':'没有符合条件的客户')+'</h3><p>'+(isEmptyAll?'点击「新增客户」按钮录入，或加载示例数据体验功能':'试试调整筛选条件')+'</p>'+(isEmptyAll?'<button class="sample-btn" id="loadSampleBtn2">加载示例数据</button>':'')+'</div>';
+    var btn=document.getElementById('loadSampleBtn2');
+    if(btn)btn.addEventListener('click',function(){
+      confirmDialog('加载示例数据','将导入5位客户+4套房源+2条成交记录作为演示数据，可随时清空。',function(){
+        S.clients=getSampleClients();S.properties=getSampleProperties();S.transactions=getSampleTransactions();
+        saveC();saveP();saveT();renderClientList();renderPropertyList();renderTxList();
+        toast('示例数据已加载','success');
+      });
+    });
+    return;
+  }
+
+  var html='<div class="client-table-wrap"><table class="client-table"><thead><tr>'
+    +'<th style="width:32px"></th>'
+    +'<th>等级</th>'
+    +'<th>客户</th>'
+    +'<th>电话</th>'
+    +'<th>来源</th>'
+    +'<th>区域</th>'
+    +'<th>预算</th>'
+    +'<th>状态</th>'
+    +'<th style="min-width:200px">需求 / 备注</th>'
+    +'<th style="min-width:180px">跟进</th>'
+    +'<th>归属</th>'
+    +'<th>录入时间</th>'
+    +'<th>操作</th>'
+    +'</tr></thead><tbody>';
+
+  for(var i=0;i<list.length;i++){
+    var c=list[i];
+    var lf=lastFollowup(c);
+    var nf=needFollowup(c);
+    var mainPhone=(c.phones&&c.phones[0])?c.phones[0].number:'';
+    var followupRel=lf?relDate(lf):'<span style="color:var(--danger)">未跟进</span>';
+    var followupContent=lf?(c.followUps.filter(function(f){return f.date===lf})[0]||{}).content||'暂无跟进记录':'点击右侧跟进按钮开始记录';
+    var pinned=(S.pinnedIds||[]).indexOf(c.id)>=0;
+    var inactive=c.status==='暂缓'||c.status==='已流失';
+    var completed=c.status==='已成交';
+
+    html+='<tr data-id="'+c.id+'"'+(pinned?' class="ct-pinned"':'')+(inactive?' class="invalid"':'')+(completed?' style="background:#f0fdf4"':'')+'>'
+      +'<td>'+(pinned?'<span title="重点关注" style="color:var(--warning)">⭐</span>':'<span style="color:var(--gray-300)">☆</span>')+'</td>'
+      +'<td><span class="ct-grade-'+esc(c.grade)+'" title="'+esc(c.grade)+'级">'+esc(c.grade||'?')+'</span></td>'
+      +'<td><span class="ct-name" title="'+esc(c.name||'')+'">'+esc(c.name||'未命名')+'</span>'
+      +(c.customTags&&c.customTags.length?' <span style="font-size:.625rem;color:var(--danger)">🏷</span>':'')
+      +(completed?' <span style="display:inline-block;padding:1px 4px;background:#dcfce7;color:#166534;font-size:.625rem;border-radius:3px;font-weight:600">已购</span>':'')
+      +(inactive?' <span style="display:inline-block;padding:1px 4px;background:var(--gray-200);color:var(--text-muted);font-size:.625rem;border-radius:3px;font-weight:600">暂缓</span>':'')
+      +(nf?' <span style="display:inline-block;padding:1px 4px;background:var(--danger-light);color:var(--danger);font-size:.625rem;border-radius:3px;font-weight:600">需跟进</span>':'')
+      +'</td>'
+      +'<td><a class="ct-phone" href="tel:'+esc(mainPhone)+'">'+esc(mainPhone)+(c.phones&&c.phones.length>1?'+'+(c.phones.length-1):'')+'</a></td>'
+      +'<td><span class="ct-source">'+esc(c.source||'—')+'</span></td>'
+      +'<td><span class="ct-area" title="'+(c.targetAreas||[]).join('·')+'">'+(c.targetAreas&&c.targetAreas.length?esc(c.targetAreas.slice(0,2).join('·')+(c.targetAreas.length>2?'…':'')):'—')+'</span></td>'
+      +'<td><span class="ct-budget">'+esc(fmtBudget(c.budgetMin,c.budgetMax))+'</span></td>'
+      +'<td><select class="ct-status-select" data-status-id="'+c.id+'" data-current="'+esc(c.status||'待联系')+'">'
+      +'<option value="待联系"'+(c.status==='待联系'?' selected':'')+'>待联系</option>'
+      +'<option value="已联系"'+(c.status==='已联系'?' selected':'')+'>已联系</option>'
+      +'<option value="看房中"'+(c.status==='看房中'?' selected':'')+'>看房中</option>'
+      +'<option value="谈判中"'+(c.status==='谈判中'?' selected':'')+'>谈判中</option>'
+      +'<option value="已成交"'+(c.status==='已成交'?' selected':'')+'>已成交</option>'
+      +'<option value="暂缓"'+(c.status==='暂缓'?' selected':'')+'>暂缓</option>'
+      +'</select></td>'
+      +'<td><span class="ct-requirements" title="'+esc(c.notes||c.requirements||'')+'">'+(c.notes||c.requirements?esc(c.notes||c.requirements):'<span style="color:var(--gray-400)">—</span>')+'</span></td>'
+      +'<td>'
+      +'<div class="ct-followup-content">'+esc(followupContent)+'</div>'
+      +'<div class="ct-followup-time">'+followupRel+'</div>'
+      +'<button class="ct-followup-btn" data-followup-id="'+c.id+'">+ 跟进</button>'
+      +'</td>'
+      +'<td><span class="ct-owner">'+(c.createdByName?esc(c.createdByName):'<span style="color:var(--gray-400)">—</span>')+'</span></td>'
+      +'<td><span class="ct-time">'+esc(fmtDate(c.createdAt))+'</span></td>'
+      +'<td>'
+      +'<button class="ct-action-btn" data-pin-id="'+c.id+'" title="'+(pinned?'取消重点':'标为重点')+'">'+(pinned?'⭐':'☆')+'</button>'
+      +'<button class="ct-action-btn" data-view-id="'+c.id+'" title="详情">详情</button>'
+      +'</td>'
+      +'</tr>';
+  }
+  html+='</tbody></table></div>';
+  table.innerHTML=html;
+
+  /* attach event handlers */
+  /* status change */
+  table.querySelectorAll('.ct-status-select').forEach(function(sel){
+    sel.addEventListener('change',function(e){
+      e.stopPropagation();
+      var id=sel.getAttribute('data-status-id');
+      var newStatus=sel.value;
+      var c=findClient(id);
+      if(!c)return;
+      var oldStatus=c.status;
+      c.status=newStatus;c.updatedAt=now();
+      /* if changed to 已成交, add a followup note */
+      if(newStatus!==oldStatus&&newStatus==='已成交'){
+        if(!c.followUps)c.followUps=[];
+        c.followUps.push({id:uuid(),content:'状态变更为「已成交」',date:now(),reminderDate:null});
+      }else if(newStatus!==oldStatus){
+        if(!c.followUps)c.followUps=[];
+        c.followUps.push({id:uuid(),content:'状态变更为「'+newStatus+'」',date:now(),reminderDate:null});
+      }
+      saveC();renderClientStats();renderClientTable();
+      toast('已更新为：'+newStatus,'success');
+    });
+    sel.addEventListener('click',function(e){e.stopPropagation()});
+  });
+
+  /* followup button */
+  table.querySelectorAll('[data-followup-id]').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var id=btn.getAttribute('data-followup-id');
+      quickFollowupPrompt(id);
+    });
+  });
+
+  /* pin/unpin */
+  table.querySelectorAll('[data-pin-id]').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var id=btn.getAttribute('data-pin-id');
+      S.pinnedIds=S.pinnedIds||[];
+      var idx=S.pinnedIds.indexOf(id);
+      if(idx>=0)S.pinnedIds.splice(idx,1);
+      else S.pinnedIds.push(id);
+      renderClientTable();
+      toast(idx>=0?'已取消重点':'已标为重点关注','success');
+    });
+  });
+
+  /* view detail */
+  table.querySelectorAll('[data-view-id]').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      showClientDetail(btn.getAttribute('data-view-id'));
+    });
+  });
+
+  /* row click -> detail */
+  table.querySelectorAll('tbody tr').forEach(function(row){
+    row.addEventListener('click',function(e){
+      if(e.target.closest('button')||e.target.closest('select')||e.target.closest('a'))return;
+      showClientDetail(row.getAttribute('data-id'));
+    });
+  });
+}
+
+function quickFollowupPrompt(id){
+  var c=findClient(id);if(!c)return;
+  var content=prompt('记录本次跟进内容（'+c.name+'）：\n当前状态：'+c.status);
+  if(!content||!content.trim())return;
+  if(!c.followUps)c.followUps=[];
+  c.followUps.push({id:uuid(),content:content.trim(),date:now(),reminderDate:null});
+  c.updatedAt=now();
+  saveC();renderClientStats();
+  if(S.clientView==='table')renderClientTable();
+  else renderClientList();
+  toast('跟进已记录','success');
 }
 
 /* ========== Client: Form ========== */
@@ -2231,6 +2402,15 @@ function setupHandlers(){
   // Add buttons
   document.getElementById('addClientBtn').addEventListener('click',function(){openClientForm()});
   document.getElementById('smartInputBtn').addEventListener('click',openSmartInput);
+  /* view toggle */
+  document.querySelectorAll('#viewToggle .vt-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var view=btn.getAttribute('data-view');
+      S.clientView=view;
+      document.querySelectorAll('#viewToggle .vt-btn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-view')===view)});
+      renderClientList();
+    });
+  });
   document.getElementById('smartParseBtn').addEventListener('click',function(){
     var text=document.getElementById('smartInputArea').value.trim();
     if(!text){toast('请先粘贴客户数据','error');return}

@@ -561,6 +561,51 @@ ul{list-style:none}
 .smart-preview-table .spv-warn{color:var(--warning);font-size:.625rem}
 .smart-preview-table .spv-ok{color:var(--success);font-size:.625rem}
 
+/* ===== View Toggle ===== */
+.view-toggle{display:inline-flex;background:var(--gray-100);border-radius:var(--radius-sm);padding:2px;gap:2px;border:1px solid var(--gray-200)}
+.vt-btn{width:30px;height:28px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border-radius:3px;color:var(--text-muted);cursor:pointer;transition:.15s}
+.vt-btn:hover{color:var(--primary)}
+.vt-btn.active{background:#fff;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* ===== Client Table View ===== */
+.client-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--gray-200);border-radius:var(--radius-md);background:#fff}
+.client-table{width:100%;border-collapse:collapse;font-size:.8125rem;background:#fff}
+.client-table thead{background:var(--gray-50);position:sticky;top:0;z-index:1}
+.client-table th{padding:10px 8px;text-align:left;font-weight:600;color:var(--text-secondary);font-size:.75rem;border-bottom:2px solid var(--gray-200);white-space:nowrap}
+.client-table td{padding:8px;border-bottom:1px solid var(--gray-100);vertical-align:middle;font-size:.8125rem}
+.client-table tbody tr:hover td{background:var(--gray-50);cursor:pointer}
+.client-table tbody tr.invalid td{background:var(--gray-100);color:var(--text-muted)}
+.client-table tbody tr.invalid td:hover{background:var(--gray-200)}
+.client-table .ct-name{font-weight:600;color:var(--text-primary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle}
+.client-table .ct-name a{color:inherit;text-decoration:none}
+.client-table .ct-phone{font-size:.75rem;color:var(--primary);font-weight:500}
+.client-table .ct-time{font-size:.75rem;color:var(--text-muted);white-space:nowrap}
+.client-table .ct-requirements{font-size:.75rem;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-table .ct-budget{font-size:.75rem;color:var(--text-primary);font-weight:500;white-space:nowrap}
+.client-table .ct-area{font-size:.6875rem;color:var(--text-secondary);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-table .ct-followup-time{font-size:.6875rem;color:var(--text-muted);margin-top:2px}
+.client-table .ct-followup-content{font-size:.75rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.4}
+.client-table .ct-owner{font-size:.75rem;color:var(--text-muted);white-space:nowrap}
+.client-table .ct-source{font-size:.6875rem;color:var(--text-secondary)}
+.client-table select.ct-status-select{height:26px;padding:0 6px;border:1px solid var(--gray-300);border-radius:var(--radius-sm);font-size:.6875rem;background:#fff;color:var(--text-primary);cursor:pointer;outline:none;transition:.15s}
+.client-table select.ct-status-select:focus{border-color:var(--primary)}
+.client-table .ct-followup-btn{display:inline-flex;align-items:center;gap:2px;height:24px;padding:0 8px;border:1px solid var(--gray-300);background:#fff;color:var(--text-secondary);border-radius:var(--radius-sm);font-size:.6875rem;cursor:pointer;transition:.15s}
+.client-table .ct-followup-btn:hover{background:var(--primary-light);color:var(--primary);border-color:var(--primary)}
+.client-table .ct-action-btn{display:inline-flex;align-items:center;justify-content:center;height:24px;min-width:24px;padding:0 6px;border:1px solid var(--gray-300);background:#fff;border-radius:var(--radius-sm);font-size:.6875rem;color:var(--text-secondary);cursor:pointer;margin-right:2px;transition:.15s}
+.client-table .ct-action-btn:hover{background:var(--primary-light);color:var(--primary);border-color:var(--primary)}
+.client-table .ct-grade-A,.client-table .ct-grade-B,.client-table .ct-grade-C{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-weight:700;font-size:.75rem;color:#fff}
+.client-table .ct-grade-A{background:linear-gradient(135deg,#ef4444,#f97316)}
+.client-table .ct-grade-B{background:linear-gradient(135deg,#3b82f6,#6366f1)}
+.client-table .ct-grade-C{background:linear-gradient(135deg,#94a3b8,#64748b)}
+.client-table .ct-pinned{box-shadow:inset 3px 0 0 var(--warning)}
+.client-table .empty-row td{text-align:center;padding:40px;color:var(--text-muted)}
+.client-table .ct-checkbox{width:14px;height:14px;cursor:pointer}
+
+/* Responsive: 小屏表格横向滚动 */
+@media (max-width:768px){
+  .client-table th,.client-table td{padding:6px 4px;font-size:.75rem}
+}
+
 /* ===== Card followup relative time ===== */
 .followup-rel{font-weight:600}
 .followup-rel.overdue{color:var(--danger)}
@@ -698,9 +743,19 @@ ul{list-style:none}
         <select id="sortSelect"><option value="updatedAt">最近更新</option><option value="createdAt">最新录入</option><option value="name">姓名</option><option value="grade">等级优先</option><option value="lastFollowup">最近跟进</option></select>
         <span class="result-count" id="resultCount"></span>
       </div>
-      <div class="toolbar-right"><button class="btn btn-outline" id="smartInputBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11H1l3-3-3-3"/><path d="M22 13l-3 3 3 3"/><path d="M15 7a4 4 0 0 0-4-4H8"/><path d="M9 17a4 4 0 0 0 4 4h3"/></svg>智能录入</button><button class="btn btn-primary" id="addClientBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增客户</button></div>
+      <div class="toolbar-right">
+        <div class="view-toggle" id="viewToggle" title="切换视图">
+          <button class="vt-btn active" data-view="card" title="卡片视图">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </button>
+          <button class="vt-btn" data-view="table" title="表格视图">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </button>
+        </div>
+        <button class="btn btn-outline" id="smartInputBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11H1l3-3-3-3"/><path d="M22 13l-3 3 3 3"/><path d="M15 7a4 4 0 0 0-4-4H8"/><path d="M9 17a4 4 0 0 0 4 4h3"/></svg>智能录入</button><button class="btn btn-primary" id="addClientBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增客户</button></div>
     </div>
     <div class="client-grid" id="clientGrid"></div>
+    <div class="client-table" id="clientTable" style="display:none"></div>
   </div>
 </div>
 
