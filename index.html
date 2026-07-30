@@ -546,6 +546,14 @@ ul{list-style:none}
 .smart-input-textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
 .smart-input-actions{display:flex;align-items:center;gap:8px;margin-top:10px}
 .smart-hint{font-size:.6875rem;color:var(--text-muted)}
+.smart-file-upload{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 0}
+.sfu-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--primary-light);color:var(--primary);border:1px dashed var(--primary);border-radius:var(--radius-sm);font-size:.6875rem;cursor:pointer;transition:.15s}
+.sfu-btn:hover{background:var(--primary);color:#fff}
+.sfu-btn svg{flex-shrink:0}
+.sfu-hint{font-size:.625rem;color:var(--text-muted)}
+.sfu-status{font-size:.6875rem;color:var(--warning);margin-top:4px;display:none}
+.sfu-status.show{display:block}
+.sfu-status.success{color:var(--success)}
 .smart-preview-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:12px;border-top:1px solid var(--gray-100)}
 .spv-title{font-size:.8125rem;font-weight:600}
 .spv-count{font-size:.6875rem;color:var(--success);font-weight:600}
@@ -788,9 +796,20 @@ ul{list-style:none}
         <select id="propSortSelect"><option value="updatedAt">最近更新</option><option value="createdAt">最新录入</option><option value="totalPrice">总价升序</option><option value="totalPriceDesc">总价降序</option></select>
         <span class="result-count" id="propResultCount"></span>
       </div>
-      <div class="toolbar-right"><button class="btn btn-primary" id="addPropBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增房源</button></div>
+      <div class="toolbar-right">
+        <div class="view-toggle" id="propViewToggle" title="切换视图">
+          <button class="vt-btn active" data-prop-view="card" title="卡片视图">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </button>
+          <button class="vt-btn" data-prop-view="table" title="表格视图">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </button>
+        </div>
+        <button class="btn btn-outline" id="smartPropInputBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11H1l3-3-3-3"/><path d="M22 13l-3 3 3 3"/><path d="M15 7a4 4 0 0 0-4-4H8"/><path d="M9 17a4 4 0 0 0 4 4h3"/></svg>智能录入</button><button class="btn btn-primary" id="addPropBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增房源</button>
+      </div>
     </div>
     <div class="property-grid" id="propertyGrid"></div>
+    <div class="client-table" id="propertyTable" style="display:none"></div>
   </div>
 </div>
 
@@ -923,6 +942,14 @@ ul{list-style:none}
         </div>
       </div>
       <textarea id="smartInputArea" class="smart-input-textarea" placeholder="在此粘贴Excel数据、客户信息文本、手机号列表...&#10;&#10;示例1（Excel粘贴）：&#10;姓名&#9;电话&#9;来源&#9;等级&#10;王先生&#9;13812345678&#9;转介绍&#9;A&#10;李女士&#9;13987654321&#9;自来客&#9;B&#10;&#10;示例2（文本）：&#10;王先生 13812345678 转介绍 A级 预算300万&#10;李女士 13987654321 自来客&#10;&#10;示例3（键值对）：&#10;姓名：张总 电话：13711112222 来源：转介绍 等级：A"></textarea>
+      <div class="smart-file-upload">
+        <label class="sfu-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          上传文件识别
+          <input type="file" id="smartFileInput" accept=".xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg" style="display:none">
+        </label>
+        <span class="sfu-hint" id="smartFileHint">支持 Excel/CSV 表格、文本文件、含文字截图照片</span>
+      </div>
       <div class="smart-input-actions">
         <button class="btn btn-primary" id="smartParseBtn">识别数据</button>
         <button class="btn btn-outline" id="smartClearBtn">清空</button>
@@ -988,6 +1015,8 @@ ul{list-style:none}
             <div class="form-field" data-show="secondhand"><label>看房方式</label><input type="text" id="pfViewingMethod" placeholder="如：随时看房"></div>
             <div class="form-field" data-show="secondhand"><label>学区</label><input type="text" id="pfSchool" placeholder="如：临平一小"></div>
             <div class="form-field" data-show="secondhand"><label>地铁</label><input type="text" id="pfMetro" placeholder="如：地铁1号线临平站"></div>
+            <div class="form-field" data-show="secondhand"><label>业主姓名</label><input type="text" id="pfOwnerName" placeholder="如：张先生"></div>
+            <div class="form-field" data-show="secondhand"><label>业主电话</label><input type="tel" id="pfOwnerPhone" placeholder="如：13912345678"></div>
             <div class="form-field" data-show="newdev"><label>开盘时间</label><input type="text" id="pfOpeningDate" placeholder="如：2026-06"></div>
             <div class="form-field" data-show="newdev"><label>交房时间</label><input type="text" id="pfDeliveryDate" placeholder="如：2028-06"></div>
             <div class="form-field" data-show="newdev"><label>在售户型</label><input type="text" id="pfAvailLayouts" placeholder="如：89-120㎡"></div>
@@ -1012,6 +1041,49 @@ ul{list-style:none}
       </form>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" data-close="propFormModal">取消</button><button class="btn btn-primary" id="savePropBtn">保存</button></div>
+  </div>
+</div>
+
+<!-- ===== Smart Property Input Modal ===== -->
+<div class="modal-overlay" id="smartPropInputModal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header"><span class="modal-title">智能录入房源</span><button class="modal-close" data-close="smartPropInputModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="smart-input-guide">
+        <div class="sig-title">支持以下粘贴格式：</div>
+        <div class="sig-formats">
+          <div class="sig-format"><span class="sig-tag">Excel表格</span>直接从Excel选中复制粘贴，自动识别列</div>
+          <div class="sig-format"><span class="sig-tag">文本信息</span>如：临平新城 89㎡ 3室 5/18层 380万 业主13912345678</div>
+          <div class="sig-format"><span class="sig-tag">键值对</span>如：小区：临平新城 总价：380万 电话：13912345678</div>
+          <div class="sig-format"><span class="sig-tag">纯手机号</span>每行一个业主手机号，自动创建房源</div>
+        </div>
+      </div>
+      <textarea id="smartPropArea" class="smart-input-textarea" placeholder="在此粘贴Excel数据、房源信息文本、业主手机号...&#10;&#10;示例1（Excel粘贴）：&#10;小区名称&#9;面积&#9;户型&#9;总价&#9;业主电话&#10;临平新城&#9;89&#9;3室2厅&#9;380&#9;13912345678&#10;万宝城&#9;120&#9;4室2厅&#9;450&#9;13812345678&#10;&#10;示例2（文本）：&#10;临平新城 89㎡ 3室2厅 5/18层 380万 业主13912345678 精装&#10;万宝城 120㎡ 4室 10/20层 450万 业主13812345678&#10;&#10;示例3（键值对）：&#10;小区：临平新城 总价：380万 电话：13912345678 户型：3室2厅 面积：89"></textarea>
+      <div class="smart-file-upload">
+        <label class="sfu-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          上传文件识别
+          <input type="file" id="smartPropFileInput" accept=".xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg" style="display:none">
+        </label>
+        <span class="sfu-hint" id="smartPropFileHint">支持 Excel/CSV 表格、文本文件、含文字截图照片</span>
+      </div>
+      <div class="smart-input-actions">
+        <button class="btn btn-primary" id="smartPropParseBtn">识别数据</button>
+        <button class="btn btn-outline" id="smartPropClearBtn">清空</button>
+        <span class="smart-hint" id="smartPropParseHint"></span>
+      </div>
+      <div id="smartPropPreviewWrap" style="display:none">
+        <div class="smart-preview-header">
+          <span class="spv-title">识别结果（可编辑）</span>
+          <span class="spv-count" id="smartPropPreviewCount"></span>
+        </div>
+        <div class="smart-preview-table" id="smartPropPreviewTable"></div>
+        <div class="smart-input-actions" style="margin-top:12px">
+          <button class="btn btn-primary" id="smartPropImportBtn">全部录入</button>
+          <button class="btn btn-outline" id="smartPropReparseBtn">重新识别</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
