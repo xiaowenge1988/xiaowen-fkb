@@ -12,7 +12,7 @@ var S={
   sort:'updatedAt', propSort:'updatedAt', txSort:'transactionDate', tab:'clients', subtab:'secondhand',
   curClientId:null, curPropId:null, curTxId:null, editClientId:null, editPropId:null, editTxId:null,
   editTags:[], editPhones:[], editAreas:[], editPropTags:[], editAreaSegs:[],
-  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:''
+  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:'', smartClients:[]
 };
 
 /* ========== Storage (本地缓存 + 云端同步) ========== */
@@ -657,6 +657,508 @@ function saveClient(){
   if(!isEdit){c.id=uuid();c.createdAt=now();c.followUps=[];c.viewings=[];c.referrals=[];c.createdBy=S.currentUser?S.currentUser.id:'';c.createdByName=S.currentUser?S.currentUser.name:'';S.clients.push(c)}
   else if(!c.createdBy&&S.currentUser){c.createdBy=S.currentUser.id;c.createdByName=S.currentUser.name}
   saveC();closeModal('clientFormModal');renderClientList();toast(isEdit?'客户信息已更新':'客户已添加','success');
+}
+
+/* ========== Client: Smart Input ========== */
+var SOURCES=['自来客','转介绍','线上咨询','老客户回访','贝壳平台','抖音/视频号'];
+var GRADES=['A','B','C'];
+var STATUSES=['待联系','已联系','看房中','谈判中','已成交','暂缓'];
+
+function openSmartInput(){
+  document.getElementById('smartInputArea').value='';
+  document.getElementById('smartPreviewWrap').style.display='none';
+  document.getElementById('smartParseHint').textContent='';
+  document.getElementById('smartInputModal').classList.add('show');
+  setTimeout(function(){document.getElementById('smartInputArea').focus()},100);
+}
+
+function parseSmartInput(text){
+  var lines=text.trim().split(/\n/);
+  var results=[];
+  var headers=null;
+  var hasData=false;
+
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    if(!line)continue;
+    hasData=true;
+
+    /* detect delimiter */
+    var fields;
+    if(line.indexOf('\t')>=0){
+      fields=line.split('\t').map(function(f){return f.trim()});
+    }else if(line.indexOf('，')>=0&&line.split('，').length>=2){
+      fields=line.split('，').map(function(f){return f.trim()});
+    }else if(line.indexOf(',')>=0&&line.split(',').length>=2&&!line.match(/^1[3-9]\d{9}/)){
+      fields=line.split(',').map(function(f){return f.trim()});
+    }else if(line.indexOf(' ')>=0){
+      fields=line.split(/\s+/).filter(function(f){return f});
+    }else{
+      fields=[line];
+    }
+
+    /* check header row */
+    if(i===0&&isHeaderRow(fields)){
+      headers=mapHeaders(fields);
+      continue;
+    }
+
+    var client={name:'',phones:[],source:'',grade:'',status:'',budgetMin:0,budgetMax:0,areas:[],notes:'',wechat:'',gender:'未知',tags:[]};
+
+    if(headers){
+      for(var j=0;j<fields.length;j++){
+        if(j>=headers.length)break;
+        var h=headers[j];var v=fields[j];
+        if(!v)continue;
+        assignField(client,h,v);
+      }
+    }else{
+      /* check if line has key:value pairs */
+      var kvParsed=parseKeyValueLine(line);
+      if(kvParsed){
+        for(var key in kvParsed){
+          assignField(client,key,kvParsed[key]);
+        }
+      }else{
+        autoDetectFields(client,fields,line);
+      }
+    }
+
+    /* fallback: extract phone from raw line if not found */
+    if(client.phones.length===0){
+      var pm=line.match(/1[3-9]\d{9}/);
+      if(pm)client.phones.push({label:'手机',number:pm[0]});
+    }
+
+    /* fallback: name from first non-phone field if empty */
+    if(!client.name){
+      for(var k=0;k<fields.length;k++){
+        var f=fields[k];
+        if(f&&!f.match(/1[3-9]\d{9}/)&&!f.match(/^A[级]?$/i)&&!f.match(/^B[级]?$/i)&&!f.match(/^C[级]?$/i)&&SOURCES.indexOf(f)<0){
+          if(f.length>=2&&f.length<=6){
+            client.name=f.replace(/[：:，,]/g,'');
+            break;
+          }
+        }
+      }
+    }
+
+    if(client.name||client.phones.length>0){
+      results.push(client);
+    }
+  }
+
+  return results;
+}
+
+function isHeaderRow(fields){
+  var headerKeywords=['姓名','名称','名字','客户','电话','手机','手机号','联系方式','来源','渠道','等级','状态','预算','价格','区域','地段','目标','备注','微信','性别','标签','需求'];
+  var matchCount=0;
+  for(var i=0;i<fields.length;i++){
+    var f=fields[i].toLowerCase();
+    for(var j=0;j<headerKeywords.length;j++){
+      if(f.indexOf(headerKeywords[j])>=0){matchCount++;break}
+    }
+  }
+  return matchCount>=2;
+}
+
+function mapHeaders(fields){
+  var mapping=[];
+  for(var i=0;i<fields.length;i++){
+    var f=fields[i].toLowerCase();
+    if(f.indexOf('姓名')>=0||f.indexOf('名称')>=0||f.indexOf('名字')>=0||f==='客户'||f.indexOf('客户名')>=0)mapping.push('name');
+    else if(f.indexOf('电话')>=0||f.indexOf('手机')>=0||f.indexOf('联系')>=0)mapping.push('phone');
+    else if(f.indexOf('来源')>=0||f.indexOf('渠道')>=0)mapping.push('source');
+    else if(f.indexOf('等级')>=0||f.indexOf('意向')>=0)mapping.push('grade');
+    else if(f.indexOf('状态')>=0)mapping.push('status');
+    else if(f.indexOf('预算')>=0||f.indexOf('价格')>=0||f.indexOf('总价')>=0)mapping.push('budget');
+    else if(f.indexOf('区域')>=0||f.indexOf('地段')>=0||f.indexOf('目标')>=0||f.indexOf('意向区域')>=0)mapping.push('area');
+    else if(f.indexOf('备注')>=0||f.indexOf('说明')>=0||f.indexOf('描述')>=0)mapping.push('notes');
+    else if(f.indexOf('微信')>=0)mapping.push('wechat');
+    else if(f.indexOf('性别')>=0)mapping.push('gender');
+    else if(f.indexOf('标签')>=0)mapping.push('tag');
+    else if(f.indexOf('需求')>=0)mapping.push('requirements');
+    else mapping.push('');
+  }
+  return mapping;
+}
+
+function parseKeyValueLine(line){
+  /* detect patterns like: 姓名：王先生 电话：13812345678 */
+  var seps=['：','：',':','＝'];
+  var hasKV=false;
+  for(var s=0;s<seps.length;s++){
+    if(line.indexOf(seps[s])>=0){hasKV=true;break}
+  }
+  if(!hasKV)return null;
+
+  var result={};
+  /* split by common delimiters while keeping key:value pairs */
+  var parts=line.split(/[\s,，;；]+/);
+  for(var p=0;p<parts.length;p++){
+    var part=parts[p].trim();
+    if(!part)continue;
+    var idx=-1;var sep='';
+    for(var s=0;s<seps.length;s++){
+      idx=part.indexOf(seps[s]);
+      if(idx>0){sep=seps[s];break}
+    }
+    if(idx>0){
+      var key=part.substring(0,idx).trim();
+      var val=part.substring(idx+sep.length).trim();
+      var normKey=normalizeKey(key);
+      if(normKey)result[normKey]=val;
+    }
+  }
+  return Object.keys(result).length>=1?result:null;
+}
+
+function normalizeKey(key){
+  key=key.toLowerCase();
+  if(key.indexOf('姓名')>=0||key.indexOf('名称')>=0||key.indexOf('名字')>=0)return'name';
+  if(key.indexOf('电话')>=0||key.indexOf('手机')>=0||key.indexOf('联系')>=0)return'phone';
+  if(key.indexOf('来源')>=0||key.indexOf('渠道')>=0)return'source';
+  if(key.indexOf('等级')>=0||key.indexOf('意向')>=0)return'grade';
+  if(key.indexOf('状态')>=0)return'status';
+  if(key.indexOf('预算')>=0||key.indexOf('价格')>=0||key.indexOf('总价')>=0)return'budget';
+  if(key.indexOf('区域')>=0||key.indexOf('地段')>=0||key.indexOf('目标')>=0)return'area';
+  if(key.indexOf('备注')>=0||key.indexOf('说明')>=0)return'notes';
+  if(key.indexOf('微信')>=0)return'wechat';
+  if(key.indexOf('性别')>=0)return'gender';
+  if(key.indexOf('标签')>=0)return'tag';
+  if(key.indexOf('需求')>=0)return'requirements';
+  return'';
+}
+
+function assignField(client,key,val){
+  val=(val||'').trim();
+  if(!val)return;
+  switch(key){
+    case'name':
+      if(!client.name)client.name=val.replace(/[：:，,]/g,'');
+      break;
+    case'phone':
+      var nums=val.match(/1[3-9]\d{9}/g)||val.match(/0\d{2,3}-?\d{7,8}/g);
+      if(nums){
+        for(var n=0;n<nums.length;n++){
+          if(!client.phones.some(function(p){return p.number===nums[n]})){
+            client.phones.push({label:'手机',number:nums[n]});
+          }
+        }
+      }else if(val.replace(/[^0-9]/g,'').length>=5){
+        client.phones.push({label:'手机',number:val.replace(/[^0-9]/g,'')});
+      }
+      break;
+    case'source':
+      var src=matchSource(val);
+      if(src)client.source=src;
+      break;
+    case'grade':
+      var g=matchGrade(val);
+      if(g)client.grade=g;
+      break;
+    case'status':
+      var st=matchStatus(val);
+      if(st)client.status=st;
+      break;
+    case'budget':
+      var bg=parseBudget(val);
+      if(bg){client.budgetMin=bg.min;client.budgetMax=bg.max}
+      break;
+    case'area':
+      var ar=matchArea(val);
+      if(ar&&client.areas.indexOf(ar)<0)client.areas.push(ar);
+      break;
+    case'notes':
+      if(!client.notes)client.notes=val;else client.notes+=' '+val;
+      break;
+    case'wechat':
+      if(!client.wechat)client.wechat=val;
+      break;
+    case'gender':
+      if(val.indexOf('男')>=0)client.gender='男';
+      else if(val.indexOf('女')>=0)client.gender='女';
+      break;
+    case'tag':
+      if(client.tags.indexOf(val)<0)client.tags.push(val);
+      break;
+    case'requirements':
+      if(!client.notes)client.notes=val;else client.notes+=' '+val;
+      break;
+  }
+}
+
+function matchSource(val){
+  for(var i=0;i<SOURCES.length;i++){
+    if(val.indexOf(SOURCES[i])>=0||SOURCES[i].indexOf(val)>=0)return SOURCES[i];
+  }
+  if(val.indexOf('介绍')>=0)return'转介绍';
+  if(val.indexOf('自')>=0||val.indexOf('到店')>=0||val.indexOf('来访')>=0)return'自来客';
+  if(val.indexOf('线上')>=0||val.indexOf('网络')>=0||val.indexOf('咨询')>=0)return'线上咨询';
+  if(val.indexOf('老')>=0&&val.indexOf('客')>=0)return'老客户回访';
+  if(val.indexOf('贝壳')>=0||val.indexOf('链家')>=0)return'贝壳平台';
+  if(val.indexOf('抖音')>=0||val.indexOf('视频')>=0)return'抖音/视频号';
+  return'';
+}
+
+function matchGrade(val){
+  var v=val.toUpperCase();
+  if(v.indexOf('A')>=0)return'A';
+  if(v.indexOf('B')>=0)return'B';
+  if(v.indexOf('C')>=0)return'C';
+  if(val.indexOf('高')>=0)return'A';
+  if(val.indexOf('中')>=0)return'B';
+  if(val.indexOf('低')>=0)return'C';
+  return'';
+}
+
+function matchStatus(val){
+  for(var i=0;i<STATUSES.length;i++){
+    if(val.indexOf(STATUSES[i])>=0)return STATUSES[i];
+  }
+  return'';
+}
+
+function parseBudget(val){
+  var num=parseInt(val.replace(/[^0-9]/g,''));
+  if(!num)return null;
+  if(val.indexOf('-')>=0||val.indexOf('~')>=0||val.indexOf('至')>=0){
+    var parts=val.split(/[-~至]/);
+    var min=parseInt(parts[0].replace(/[^0-9]/g,''))||0;
+    var max=parseInt(parts[1].replace(/[^0-9]/g,''))||0;
+    return{min:min,max:max};
+  }
+  return{min:0,max:num};
+}
+
+function matchArea(val){
+  for(var i=0;i<AREAS.length;i++){
+    if(val.indexOf(AREAS[i])>=0)return AREAS[i];
+  }
+  return'';
+}
+
+function autoDetectFields(client,fields,rawLine){
+  for(var i=0;i<fields.length;i++){
+    var f=fields[i].trim();
+    if(!f)continue;
+
+    /* phone number */
+    if(f.match(/1[3-9]\d{9}/)){
+      var pm=f.match(/1[3-9]\d{9}/);
+      if(pm&&!client.phones.some(function(p){return p.number===pm[0]})){
+        client.phones.push({label:'手机',number:pm[0]});
+      }
+      continue;
+    }
+    /* landline */
+    if(f.match(/0\d{2,3}-?\d{7,8}/)){
+      var lm=f.match(/0\d{2,3}-?\d{7,8}/);
+      if(lm)client.phones.push({label:'座机',number:lm[0]});
+      continue;
+    }
+
+    /* grade */
+    if(f.match(/^[ABCabc][级]?$/)){
+      client.grade=f.toUpperCase().charAt(0);
+      continue;
+    }
+    if(f.indexOf('高意向')>=0||f.indexOf('A级')>=0){client.grade='A';continue}
+    if(f.indexOf('中意向')>=0||f.indexOf('B级')>=0){client.grade='B';continue}
+    if(f.indexOf('低意向')>=0||f.indexOf('C级')>=0){client.grade='C';continue}
+
+    /* source */
+    var src=matchSource(f);
+    if(src){client.source=src;continue}
+
+    /* budget */
+    if(f.indexOf('预算')>=0||f.match(/\d+万/)||f.match(/\d{2,4}w/i)){
+      var bg=parseBudget(f.replace('预算','').replace('万','').replace('w','').replace('W',''));
+      if(bg){client.budgetMin=bg.min;client.budgetMax=bg.max;continue}
+    }
+
+    /* area */
+    var ar=matchArea(f);
+    if(ar){if(client.areas.indexOf(ar)<0)client.areas.push(ar);continue}
+
+    /* wechat */
+    if(f.indexOf('微信')>=0||f.indexOf('wx')>=0||f.indexOf('WX')>=0||f.indexOf('v信')>=0){
+      var wx=f.replace(/微信|微|wx|WX|v信/g,'').replace(/[：:]/g,'');
+      if(wx)client.wechat=wx;
+      continue;
+    }
+
+    /* gender */
+    if(f==='男'||f.indexOf('先生')>=0){client.gender='男';if(!client.name)client.name=f;continue}
+    if(f==='女'||f.indexOf('女士')>=0||f.indexOf('小姐')>=0){client.gender='女';if(!client.name)client.name=f;continue}
+    if(f.indexOf('总')>=0&&f.length<=4){client.gender='男';if(!client.name)client.name=f;continue}
+
+    /* status */
+    var st=matchStatus(f);
+    if(st){client.status=st;continue}
+
+    /* name: 2-6 chars, mostly Chinese */
+    if(!client.name&&f.length>=2&&f.length<=6&&f.match(/^[\u4e00-\u9fa5A-Za-z]/)){
+      client.name=f.replace(/[：:，,]/g,'');
+      continue;
+    }
+
+    /* everything else -> notes */
+    if(f.length>1){
+      if(!client.notes)client.notes=f;else client.notes+=' '+f;
+    }
+  }
+}
+
+function renderSmartPreview(clients){
+  var wrap=document.getElementById('smartPreviewWrap');
+  var table=document.getElementById('smartPreviewTable');
+  var count=document.getElementById('smartPreviewCount');
+
+  if(!clients||clients.length===0){
+    wrap.style.display='none';
+    document.getElementById('smartParseHint').textContent='未识别到有效客户数据';
+    document.getElementById('smartParseHint').style.color='var(--warning)';
+    return;
+  }
+
+  count.textContent='共识别 '+clients.length+' 条';
+  wrap.style.display='block';
+
+  var html='<table><thead><tr>'+
+    '<th style="width:30px">#</th>'+
+    '<th>姓名</th>'+
+    '<th>电话</th>'+
+    '<th>来源</th>'+
+    '<th>等级</th>'+
+    '<th>预算(万)</th>'+
+    '<th>区域</th>'+
+    '<th>备注</th>'+
+    '<th style="width:30px"></th>'+
+    '</tr></thead><tbody>';
+
+  for(var i=0;i<clients.length;i++){
+    var c=clients[i];
+    var phoneStr=c.phones.map(function(p){return p.number}).join('; ');
+    var areaStr=c.areas.join(',');
+    var hasPhone=c.phones.length>0;
+    var hasName=!!c.name;
+    var status=hasName&&hasPhone?'<span class="spv-ok">✓</span>':'<span class="spv-warn">缺'+(!hasName?'姓名':'电话')+'</span>';
+
+    html+='<tr data-idx="'+i+'">'+
+      '<td style="text-align:center;color:var(--text-muted)">'+(i+1)+'</td>'+
+      '<td><input type="text" data-field="name" value="'+esc(c.name)+'" placeholder="姓名"></td>'+
+      '<td><input type="text" data-field="phone" value="'+esc(phoneStr)+'" placeholder="电话"></td>'+
+      '<td><select data-field="source"><option value="">选择</option>'+SOURCES.map(function(s){return'<option'+(c.source===s?' selected':'')+'>'+s+'</option>'}).join('')+'</select></td>'+
+      '<td><select data-field="grade" style="width:50px"><option value="">-</option>'+GRADES.map(function(g){return'<option value="'+g+'"'+(c.grade===g?' selected':'')+'>'+g+'</option>'}).join('')+'</select></td>'+
+      '<td><input type="text" data-field="budget" value="'+(c.budgetMax?c.budgetMin+'-'+c.budgetMax:'')+'" placeholder="如300" style="width:60px"></td>'+
+      '<td><input type="text" data-field="area" value="'+esc(areaStr)+'" placeholder="区域"></td>'+
+      '<td><input type="text" data-field="notes" value="'+esc(c.notes)+'" placeholder="备注"></td>'+
+      '<td><span class="spv-del" data-del="'+i+'">×</span></td>'+
+      '</tr>';
+  }
+  html+='</tbody></table>';
+  table.innerHTML=html;
+
+  /* attach del handlers */
+  table.querySelectorAll('.spv-del').forEach(function(el){
+    el.addEventListener('click',function(){
+      var idx=parseInt(el.getAttribute('data-del'));
+      S.smartClients.splice(idx,1);
+      renderSmartPreview(S.smartClients);
+    });
+  });
+}
+
+function collectSmartClients(){
+  var rows=document.querySelectorAll('#smartPreviewTable tbody tr');
+  var clients=[];
+  rows.forEach(function(row){
+    var name=row.querySelector('[data-field="name"]').value.trim();
+    var phoneStr=row.querySelector('[data-field="phone"]').value.trim();
+    var source=row.querySelector('[data-field="source"]').value;
+    var grade=row.querySelector('[data-field="grade"]').value;
+    var budgetStr=row.querySelector('[data-field="budget"]').value.trim();
+    var areaStr=row.querySelector('[data-field="area"]').value.trim();
+    var notes=row.querySelector('[data-field="notes"]').value.trim();
+
+    if(!name&&!phoneStr)return;
+
+    var phones=[];
+    var phoneNums=phoneStr.match(/1[3-9]\d{9}/g)||phoneStr.match(/0\d{2,3}-?\d{7,8}/g);
+    if(phoneNums){
+      phoneNums.forEach(function(n){phones.push({label:'手机',number:n})});
+    }else if(phoneStr.replace(/[^0-9]/g,'').length>=5){
+      phones.push({label:'手机',number:phoneStr.replace(/[^0-9]/g,'')});
+    }
+
+    var budgetMin=0,budgetMax=0;
+    if(budgetStr){
+      if(budgetStr.indexOf('-')>=0||budgetStr.indexOf('~')>=0){
+        var parts=budgetStr.split(/[-~]/);
+        budgetMin=parseInt(parts[0].replace(/[^0-9]/g,''))||0;
+        budgetMax=parseInt(parts[1].replace(/[^0-9]/g,''))||0;
+      }else{
+        budgetMax=parseInt(budgetStr.replace(/[^0-9]/g,''))||0;
+      }
+    }
+
+    var areas=[];
+    if(areaStr){
+      AREAS.forEach(function(a){
+        if(areaStr.indexOf(a)>=0)areas.push(a);
+      });
+    }
+
+    clients.push({
+      name:name||'未命名',
+      phones:phones,
+      source:source||'自来客',
+      grade:grade||'B',
+      status:'待联系',
+      budgetMin:budgetMin,
+      budgetMax:budgetMax,
+      targetAreas:areas,
+      notes:notes,
+      wechat:'',
+      gender:'未知',
+      customTags:[],
+      requirements:''
+    });
+  });
+  return clients;
+}
+
+function batchImportClients(){
+  var clients=collectSmartClients();
+  if(clients.length===0){toast('没有可录入的客户','error');return}
+
+  var imported=0,skipped=0;
+  for(var i=0;i<clients.length;i++){
+    var c=clients[i];
+    if(!c.name||c.phones.length===0){skipped++;continue}
+
+    /* dedup: check if phone already exists */
+    var dup=false;
+    for(var j=0;j<S.clients.length;j++){
+      var existing=S.clients[j];
+      if(existing.phones&&existing.phones.some(function(p){
+        return c.phones.some(function(np){return p.number===np.number});
+      })){dup=true;break}
+    }
+    if(dup){skipped++;continue}
+
+    c.id=uuid();c.createdAt=now();c.updatedAt=now();
+    c.followUps=[];c.viewings=[];c.referrals=[];
+    c.createdBy=S.currentUser?S.currentUser.id:'';
+    c.createdByName=S.currentUser?S.currentUser.name:'';
+    S.clients.push(c);
+    imported++;
+  }
+
+  saveC();renderClientList();closeModal('smartInputModal');
+  toast('成功录入 '+imported+' 位客户'+(skipped>0?'，跳过 '+skipped+' 条（信息不全或重复）':''),'success');
 }
 
 /* ========== Client: Detail ========== */
@@ -1728,6 +2230,31 @@ function setupHandlers(){
   document.getElementById('propSortSelect').addEventListener('change',function(){S.propSort=this.value;renderPropertyList()});
   // Add buttons
   document.getElementById('addClientBtn').addEventListener('click',function(){openClientForm()});
+  document.getElementById('smartInputBtn').addEventListener('click',openSmartInput);
+  document.getElementById('smartParseBtn').addEventListener('click',function(){
+    var text=document.getElementById('smartInputArea').value.trim();
+    if(!text){toast('请先粘贴客户数据','error');return}
+    S.smartClients=parseSmartInput(text);
+    if(S.smartClients.length===0){
+      document.getElementById('smartParseHint').textContent='未识别到有效客户数据，请检查格式';
+      document.getElementById('smartParseHint').style.color='var(--warning)';
+      document.getElementById('smartPreviewWrap').style.display='none';
+      return;
+    }
+    document.getElementById('smartParseHint').textContent='已识别 '+S.smartClients.length+' 位客户，请检查后点击「全部录入」';
+    document.getElementById('smartParseHint').style.color='var(--success)';
+    renderSmartPreview(S.smartClients);
+  });
+  document.getElementById('smartClearBtn').addEventListener('click',function(){
+    document.getElementById('smartInputArea').value='';
+    document.getElementById('smartPreviewWrap').style.display='none';
+    document.getElementById('smartParseHint').textContent='';
+    S.smartClients=[];
+  });
+  document.getElementById('smartReparseBtn').addEventListener('click',function(){
+    document.getElementById('smartParseBtn').click();
+  });
+  document.getElementById('smartImportBtn').addEventListener('click',batchImportClients);
   document.getElementById('addPropBtn').addEventListener('click',function(){openPropertyForm()});
   document.getElementById('fab').addEventListener('click',function(){if(S.tab==='clients')openClientForm();if(S.tab==='properties')openPropertyForm();if(S.tab==='transactions')openTxForm()});
   // Save

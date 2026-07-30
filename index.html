@@ -536,6 +536,31 @@ ul{list-style:none}
 .today-task-item .tt-info{font-size:.6875rem;color:var(--text-muted)}
 .today-task-item .tt-badge{padding:1px 6px;border-radius:8px;font-size:.5625rem;font-weight:600;background:var(--danger);color:#fff}
 
+/* ===== Smart Input Modal ===== */
+.smart-input-guide{margin-bottom:12px}
+.sig-title{font-size:.75rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
+.sig-formats{display:flex;flex-wrap:wrap;gap:8px}
+.sig-format{display:flex;align-items:center;gap:4px;font-size:.6875rem;color:var(--text-muted);background:var(--gray-50);padding:4px 8px;border-radius:var(--radius-sm)}
+.sig-tag{background:var(--primary-light);color:var(--primary);font-weight:600;padding:1px 6px;border-radius:4px;font-size:.625rem}
+.smart-input-textarea{width:100%;min-height:160px;resize:vertical;border:1px solid var(--gray-300);border-radius:var(--radius-sm);padding:10px 12px;font-size:.8125rem;line-height:1.6;outline:none;transition:.2s;font-family:inherit}
+.smart-input-textarea:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-light)}
+.smart-input-actions{display:flex;align-items:center;gap:8px;margin-top:10px}
+.smart-hint{font-size:.6875rem;color:var(--text-muted)}
+.smart-preview-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:12px;border-top:1px solid var(--gray-100)}
+.spv-title{font-size:.8125rem;font-weight:600}
+.spv-count{font-size:.6875rem;color:var(--success);font-weight:600}
+.smart-preview-table{max-height:360px;overflow:auto;border:1px solid var(--gray-200);border-radius:var(--radius-sm)}
+.smart-preview-table table{width:100%;border-collapse:collapse;font-size:.75rem}
+.smart-preview-table th{position:sticky;top:0;background:var(--gray-50);text-align:left;padding:6px 8px;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--gray-200);white-space:nowrap;z-index:1}
+.smart-preview-table td{padding:4px 8px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.smart-preview-table tr:hover td{background:var(--gray-50)}
+.smart-preview-table input,.smart-preview-table select{border:1px solid transparent;background:transparent;padding:2px 4px;font-size:.75rem;border-radius:3px;outline:none;width:100%;min-width:60px;transition:.15s}
+.smart-preview-table input:focus,.smart-preview-table select:focus{border-color:var(--primary);background:#fff}
+.smart-preview-table .spv-del{cursor:pointer;color:var(--text-muted);font-size:1rem;padding:2px 4px}
+.smart-preview-table .spv-del:hover{color:var(--danger)}
+.smart-preview-table .spv-warn{color:var(--warning);font-size:.625rem}
+.smart-preview-table .spv-ok{color:var(--success);font-size:.625rem}
+
 /* ===== Card followup relative time ===== */
 .followup-rel{font-weight:600}
 .followup-rel.overdue{color:var(--danger)}
@@ -673,7 +698,7 @@ ul{list-style:none}
         <select id="sortSelect"><option value="updatedAt">最近更新</option><option value="createdAt">最新录入</option><option value="name">姓名</option><option value="grade">等级优先</option><option value="lastFollowup">最近跟进</option></select>
         <span class="result-count" id="resultCount"></span>
       </div>
-      <div class="toolbar-right"><button class="btn btn-primary" id="addClientBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增客户</button></div>
+      <div class="toolbar-right"><button class="btn btn-outline" id="smartInputBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11H1l3-3-3-3"/><path d="M22 13l-3 3 3 3"/><path d="M15 7a4 4 0 0 0-4-4H8"/><path d="M9 17a4 4 0 0 0 4 4h3"/></svg>智能录入</button><button class="btn btn-primary" id="addClientBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增客户</button></div>
     </div>
     <div class="client-grid" id="clientGrid"></div>
   </div>
@@ -825,6 +850,41 @@ ul{list-style:none}
       </form>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" data-close="clientFormModal">取消</button><button class="btn btn-primary" id="saveClientBtn">保存</button></div>
+  </div>
+</div>
+
+<!-- ===== Smart Input Modal ===== -->
+<div class="modal-overlay" id="smartInputModal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-header"><span class="modal-title">智能录入客户</span><button class="modal-close" data-close="smartInputModal"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="modal-body">
+      <div class="smart-input-guide">
+        <div class="sig-title">支持以下粘贴格式：</div>
+        <div class="sig-formats">
+          <div class="sig-format"><span class="sig-tag">Excel表格</span>直接从Excel选中单元格复制粘贴，自动识别列</div>
+          <div class="sig-format"><span class="sig-tag">文本名片</span>如：王先生 13812345678 转介绍 A级</div>
+          <div class="sig-format"><span class="sig-tag">键值对</span>如：姓名：王先生，电话：13812345678</div>
+          <div class="sig-format"><span class="sig-tag">纯手机号</span>每行一个或多个手机号，自动识别</div>
+        </div>
+      </div>
+      <textarea id="smartInputArea" class="smart-input-textarea" placeholder="在此粘贴Excel数据、客户信息文本、手机号列表...&#10;&#10;示例1（Excel粘贴）：&#10;姓名&#9;电话&#9;来源&#9;等级&#10;王先生&#9;13812345678&#9;转介绍&#9;A&#10;李女士&#9;13987654321&#9;自来客&#9;B&#10;&#10;示例2（文本）：&#10;王先生 13812345678 转介绍 A级 预算300万&#10;李女士 13987654321 自来客&#10;&#10;示例3（键值对）：&#10;姓名：张总 电话：13711112222 来源：转介绍 等级：A"></textarea>
+      <div class="smart-input-actions">
+        <button class="btn btn-primary" id="smartParseBtn">识别数据</button>
+        <button class="btn btn-outline" id="smartClearBtn">清空</button>
+        <span class="smart-hint" id="smartParseHint"></span>
+      </div>
+      <div id="smartPreviewWrap" style="display:none">
+        <div class="smart-preview-header">
+          <span class="spv-title">识别结果（可编辑）</span>
+          <span class="spv-count" id="smartPreviewCount"></span>
+        </div>
+        <div class="smart-preview-table" id="smartPreviewTable"></div>
+        <div class="smart-input-actions" style="margin-top:12px">
+          <button class="btn btn-primary" id="smartImportBtn">全部录入</button>
+          <button class="btn btn-outline" id="smartReparseBtn">重新识别</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
