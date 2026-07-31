@@ -357,10 +357,22 @@ async function handleApi(req, res, pathname, method) {
     var ids = Object.keys(mediaMeta).filter(function(id) { return mediaMeta[id].propertyId === propId; });
     var records = [];
     ids.forEach(function(id) {
-      var mf = path.join(MEDIA_DIR, id + '.json');
-      if (fs.existsSync(mf)) {
-        try { records.push(JSON.parse(fs.readFileSync(mf, 'utf-8'))); }
-        catch (e) {}
+      var meta = mediaMeta[id];
+      if (meta && meta.isRawFile) {
+        /* raw 文件：只返回元数据 + URL，不加载文件内容 */
+        records.push({
+          id: meta.id, propertyId: meta.propertyId, type: meta.type,
+          name: meta.name || '', category: meta.category || '',
+          showroomArea: meta.showroomArea || '', showroomType: meta.showroomType || '',
+          serverUrl: '/api/media/file/' + meta.id, isRawFile: true
+        });
+      } else {
+        /* 旧格式：JSON 文件中包含 base64 dataUrl */
+        var mf = path.join(MEDIA_DIR, id + '.json');
+        if (fs.existsSync(mf)) {
+          try { records.push(JSON.parse(fs.readFileSync(mf, 'utf-8'))); }
+          catch (e) {}
+        }
       }
     });
     sendJson(res, 200, records);
@@ -390,12 +402,94 @@ async function handleApi(req, res, pathname, method) {
     return;
   }
 
+  /* --- 媒体原始文件上传（视频专用，raw binary） --- */
+  if (pathname === '/api/media/upload-raw' && method === 'POST') {
+    var userRaw = requireAuth(req, res); if (!userRaw) return;
+    try {
+      var urlObj = new URL('http://localhost' + req.url);
+      var q = urlObj.searchParams;
+      var rawMediaId = q.get('id') || genId();
+      var rawPropId = q.get('propertyId') || '';
+      var rawType = q.get('type') || 'video';
+      var rawName = q.get('name') || 'upload.mp4';
+      var rawCategory = q.get('category') || '';
+      var rawShowroomArea = q.get('showroomArea') || '';
+      var rawShowroomType = q.get('showroomType') || '';
+      var rawExt = rawType === 'video' ? '.mp4' : '.jpg';
+      var rawFilePath = path.join(MEDIA_DIR, rawMediaId + rawExt);
+      /* 流式写入文件，避免内存堆积 */
+      var writeStream = fs.createWriteStream(rawFilePath);
+      var rawSize = 0;
+      var sizeLimit = 600 * 1024 * 1024; /* 600MB limit for raw uploads */
+      req.on('data', function(chunk) {
+        rawSize += chunk.length;
+        if (rawSize > sizeLimit) {
+          writeStream.destroy();
+          fs.unlinkSync(rawFilePath);
+          sendJson(res, 413, { error: '文件超过600MB限制' });
+          return;
+        }
+        writeStream.write(chunk);
+      });
+      req.on('end', function() {
+        writeStream.end();
+        writeStream.on('finish', function() {
+          if (!db.mediaMeta) db.mediaMeta = {};
+          db.mediaMeta[rawMediaId] = {
+            id: rawMediaId, propertyId: rawPropId, type: rawType,
+            name: rawName, category: rawCategory,
+            showroomArea: rawShowroomArea, showroomType: rawShowroomType,
+            isRawFile: true,
+            uploadedBy: userRaw.id
+          };
+          saveDb({ mediaMeta: db.mediaMeta });
+          sendJson(res, 200, { ok: true, id: rawMediaId, url: '/api/media/file/' + rawMediaId });
+        });
+      });
+      req.on('error', function(e) {
+        writeStream.destroy();
+        if (fs.existsSync(rawFilePath)) fs.unlinkSync(rawFilePath);
+        sendJson(res, 500, { error: '上传失败: ' + e.message });
+      });
+    } catch (e) { sendJson(res, 400, { error: e.message }); }
+    return;
+  }
+
+  /* --- 媒体原始文件获取（流式返回，不加载到内存） --- */
+  if (pathname.indexOf('/api/media/file/') === 0 && method === 'GET') {
+    var userFile = requireAuth(req, res); if (!userFile) return;
+    var fileMediaId = decodeURIComponent(pathname.replace('/api/media/file/', ''));
+    var fileMeta = (db.mediaMeta || {})[fileMediaId];
+    if (!fileMeta) { sendJson(res, 404, { error: 'Not found' }); return; }
+    var fileExt = fileMeta.type === 'video' ? '.mp4' : '.jpg';
+    var rawFp = path.join(MEDIA_DIR, fileMediaId + fileExt);
+    if (!fs.existsSync(rawFp)) { sendJson(res, 404, { error: 'File not found' }); return; }
+    var stat = fs.statSync(rawFp);
+    var ct = fileMeta.type === 'video' ? 'video/mp4' : 'image/jpeg';
+    res.writeHead(200, {
+      'Content-Type': ct,
+      'Content-Length': stat.size,
+      'Cache-Control': 'public, max-age=86400',
+      'Accept-Ranges': 'bytes'
+    });
+    fs.createReadStream(rawFp).pipe(res);
+    return;
+  }
+
   /* --- 媒体删除 --- */
   if (pathname.indexOf('/api/media/') === 0 && method === 'DELETE') {
     var user6 = requireAuth(req, res); if (!user6) return;
     var mediaId2 = decodeURIComponent(pathname.replace('/api/media/', ''));
+    /* 删除 JSON 格式的旧文件 */
     var fp = path.join(MEDIA_DIR, mediaId2 + '.json');
     if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    /* 删除 raw 格式的文件（视频/图片） */
+    var meta2 = (db.mediaMeta || {})[mediaId2];
+    if (meta2 && meta2.isRawFile) {
+      var rawExt2 = meta2.type === 'video' ? '.mp4' : '.jpg';
+      var rawFp2 = path.join(MEDIA_DIR, mediaId2 + rawExt2);
+      if (fs.existsSync(rawFp2)) fs.unlinkSync(rawFp2);
+    }
     if (db.mediaMeta && db.mediaMeta[mediaId2]) {
       delete db.mediaMeta[mediaId2];
       saveDb({ mediaMeta: db.mediaMeta });
@@ -413,6 +507,12 @@ async function handleApi(req, res, pathname, method) {
       if (mm[id].propertyId === propId2) {
         var f = path.join(MEDIA_DIR, id + '.json');
         if (fs.existsSync(f)) fs.unlinkSync(f);
+        /* 删除 raw 格式文件 */
+        if (mm[id].isRawFile) {
+          var rawExt3 = mm[id].type === 'video' ? '.mp4' : '.jpg';
+          var rawFp3 = path.join(MEDIA_DIR, id + rawExt3);
+          if (fs.existsSync(rawFp3)) fs.unlinkSync(rawFp3);
+        }
         delete mm[id];
       }
     });
