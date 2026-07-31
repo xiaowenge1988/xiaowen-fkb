@@ -4,6 +4,7 @@
  * 零依赖 Node.js HTTP 服务器
  */
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -107,7 +108,7 @@ function serveStatic(req, res, pathname) {
       var indexPath = path.join(ROOT, 'index.html');
       fs.readFile(indexPath, function(e2, data) {
         if (e2) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
         res.end(data);
       });
       return;
@@ -115,8 +116,10 @@ function serveStatic(req, res, pathname) {
     var ext = path.extname(filePath).toLowerCase();
     var contentType = MIME[ext] || 'application/octet-stream';
     var cacheHeaders = {};
-    if (ext === '.html' || ext === '.js' || ext === '.css') cacheHeaders['Cache-Control'] = 'no-cache';
+    if (ext === '.html' || ext === '.js' || ext === '.css') cacheHeaders['Cache-Control'] = 'no-store, no-cache, must-revalidate';
     else cacheHeaders['Cache-Control'] = 'public, max-age=86400';
+    cacheHeaders['Pragma'] = 'no-cache';
+    cacheHeaders['Expires'] = '0';
     res.writeHead(200, Object.assign({ 'Content-Type': contentType }, cacheHeaders));
     fs.createReadStream(filePath).pipe(res);
   });
@@ -415,6 +418,33 @@ async function handleApi(req, res, pathname, method) {
     });
     saveDb({ mediaMeta: mm });
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  /* --- 图片代理：抓取外部图片（公众号/网页），返回base64 --- */
+  if (pathname === '/api/proxy/image' && method === 'GET') {
+    var parsedUrl = new URL(req.url, 'http://' + (req.headers.host || 'localhost'));
+    var imgUrl = parsedUrl.searchParams.get('url');
+    if (!imgUrl) { sendJson(res, 400, { ok: false, error: '缺少 url 参数' }); return; }
+    if (!/^https?:\/\//i.test(imgUrl)) { sendJson(res, 400, { ok: false, error: '无效的URL' }); return; }
+    var lib = imgUrl.startsWith('https') ? https : http;
+    var options = { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': imgUrl } };
+    var proxyReq = lib.get(imgUrl, options, function(proxyRes) {
+      if (proxyRes.statusCode !== 200) { sendJson(res, 502, { ok: false, error: '图片获取失败 HTTP ' + proxyRes.statusCode }); return; }
+      var contentType = proxyRes.headers['content-type'] || 'image/jpeg';
+      if (contentType.indexOf('image') < 0) { sendJson(res, 400, { ok: false, error: '非图片类型: ' + contentType }); return; }
+      var chunks = [];
+      proxyRes.on('data', function(chunk) { chunks.push(chunk); });
+      proxyRes.on('end', function() {
+        var buffer = Buffer.concat(chunks);
+        if (buffer.length < 100) { sendJson(res, 400, { ok: false, error: '图片太小，可能是图标' }); return; }
+        var b64 = buffer.toString('base64');
+        var dataUrl = 'data:' + contentType + ';base64,' + b64;
+        sendJson(res, 200, { ok: true, dataUrl: dataUrl, size: buffer.length });
+      });
+    });
+    proxyReq.on('error', function(err) { sendJson(res, 500, { ok: false, error: err.message }); });
+    proxyReq.setTimeout(10000, function() { proxyReq.destroy(); sendJson(res, 504, { ok: false, error: '获取超时' }); });
     return;
   }
 
