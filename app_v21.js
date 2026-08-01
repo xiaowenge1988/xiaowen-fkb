@@ -946,7 +946,9 @@ function openSmartInput(){
 }
 
 function parseSmartInput(text){
-  var lines=text.trim().split(/\n/);
+  /* 0) OCR文本预处理（如果是图片OCR来的文本，先清洗UI噪声） */
+  var preCleaned=typeof preprocessOcrText==='function'?preprocessOcrText(text):text;
+  var lines=preCleaned.trim().split(/\n/);
   var results=[];
   var headers=null;
   var hasData=false;
@@ -1499,11 +1501,231 @@ function openSmartPropInput(mode,targetId){
   setTimeout(function(){document.getElementById('smartPropArea').focus()},100);
 }
 
+/* ========== OCR文本预处理 + 智能分组 ========== */
+
+/* OCR识别后图片里常带的一些UI界面提示词（按钮文字、placeholder、表头截断等），识别时需要过滤 */
+var OCR_NOISE_PATTERNS=[
+  /^电话查看$/, /^详情查看$/, /^查看$/, /^更多$/, /^展开$/, /^收起$/, /^全部$/,
+  /^必填$/, /^选填$/, /^请填写$/, /^请输入$/, /^请选择$/, /^点击上传$/, /^上传$/, /^删除$/,
+  /^编辑$/, /^保存$/, /^取消$/, /^确定$/, /^返回$/, /^关闭$/, /^提交$/, /^重置$/, /^搜索$/,
+  /^提示[：:]?$/, /^说明[：:]?$/, /^备注[：:]?$/, /^添加图片$/, /^更换图片$/, /^暂无数据$/,
+  /^加载中/, /^加载失败/, /^暂无/, /^点击/, /^双击/, /^长按/, /^滑动/, /^右键/,
+  /^公盘电话/, /^名单来源/, /^时六知理员/, /^知理员$/, /^六知理员$/,
+  /^填写跟进/, /^跟进后关机/, /^填写后/, /^跟进$/,
+  /^未到访$/, /^已到访$/, /^已参观$/, /^已带看$/,
+  /^来源[：:]?$/, /^渠道[：:]?$/,
+  /^业主电话[：:]?$/, /^业主[：:]?$/, /^业主姓名[：:]?$/, /^联系方式[：:]?$/,
+  /^联系电话[：:]?$/, /^小区[：:]?$/, /^地址[：:]?$/, /^面积[：:]?$/, /^楼层[：:]?$/, /^户型[：:]?$/,
+  /^物业[：:]?$/, /^楼盘[：:]?$/, /^开发商[：:]?$/, /^单价[：:]?$/, /^总价[：:]?$/, /^均价[：:]?$/
+];
+var OCR_NOISE_SUBSTR=['必填填写跟进后关机本','必填填写跟进','填写跟进后','电话查看','详情查看','必填填写','跟进后关机','时六知理员','名单来源','填写跟进','列表来源','理员','项源','查看更多','点击查看','点击详情','公盘电话','填写','跟进后','关机','公盘'];
+
+function isOcrNoiseLine(line){
+  if(!line)return true;
+  var t=line.trim();
+  if(t.length<2)return true;
+  /* "楼号-房号"格式（如16-1704、3-501、5-2-301）不是噪声，是有效数据（必须优先于"纯数字"判断） */
+  if(/^\d+\s*[\-－—\/／]\s*\d+/.test(t))return false;
+  /* 全是数字+标点（无中文/英文） → 噪声 */
+  if(/^[\d\s\-_,\.，。:：()（）\/\\]+$/.test(t)&&!/[\u4e00-\u9fa5a-zA-Z]/.test(t))return true;
+  for(var i=0;i<OCR_NOISE_PATTERNS.length;i++){
+    if(OCR_NOISE_PATTERNS[i].test(t))return true;
+  }
+  for(var j=0;j<OCR_NOISE_SUBSTR.length;j++){
+    if(t.indexOf(OCR_NOISE_SUBSTR[j])>=0&&t.length<=12)return true;
+  }
+  return false;
+}
+
+/* OCR文本清洗：去除UI噪声词、空白行合并、把字段标签（"小区："）前的纯标签词剥离开 */
+function preprocessOcrText(text){
+  if(!text)return'';
+  var lines=text.split(/\n/);
+  var cleanLines=[];
+  /* 已知字段标签（OCR识别图片里的字段前缀），需要把这些标签和冒号/空格剥离开 */
+  var FIELD_LABELS=['小区','楼盘','楼盘名','项目','项目名称','房源','房源名称','地址','物业地址',
+    '楼栋','楼幢','楼号','楼','幢','座','栋','单元','室号','门牌','门牌号','房号','房间号',
+    '面积','建面','建筑面积','户型','房型','楼层','朝向','装修','总价','售价','单价','均价',
+    '业主','业主姓名','业主电话','电话','手机','手机号','联系方式','联系人','对接人','对接人电话',
+    '佣金','保护期','状态','备注','描述','说明','标签','业主电话',
+    '开发商','开盘','交付','交房','交付时间','开盘时间','总户数','绿化率','容积率','物业类型','物业费'];
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    if(!line)continue;
+    /* 跳过明显的噪声行 */
+    if(isOcrNoiseLine(line))continue;
+    var preserved=line;
+    /* 有用内容判断：去除噪声子串后还有数字/中文/英文就算有用。
+   用于剥离"小区 BEREH 详情查看"这种 value 里含子串噪声的情况 */
+    var hasUsefulContent=function(v){
+      v=(v||'').trim();
+      if(!v)return false;
+      var cleaned=v;
+      for(var ck=0;ck<OCR_NOISE_SUBSTR.length;ck++){
+        cleaned=cleaned.split(OCR_NOISE_SUBSTR[ck]).join('');
+      }
+      cleaned=cleaned.trim();
+      if(!cleaned)return false;
+      if(/[\d\u4e00-\u9fa5a-zA-Z]/.test(cleaned))return true;
+      return false;
+    };
+
+    /* 1) 标签+冒号+值的剥离："小区: BEREH" → "BEREH" */
+    var m1=preserved.match(/^([^：:]{1,8})[：:]\s*(.{1,})$/);
+    if(m1){
+      var label1=m1[1].trim();
+      var value1=m1[2].trim();
+      if(FIELD_LABELS.indexOf(label1)>=0&&hasUsefulContent(value1)){
+        preserved=value1;
+      }
+    }
+    /* 2) 标签+空格+值的剥离（OCR可能把冒号识别成空格）：
+          "小区 BEREH" → "BEREH"、"业主电话 18072979236" → "18072979236"。
+          多次尝试（防止"小区"被剥离成"详情查看"又被剥离失败）。
+          这里不能简单用 isOcrNoiseLine(value)，因为 value 可能含"详情查看"等子串噪声 */
+    for(var tryI=0;tryI<3;tryI++){
+      var m2=preserved.match(/^([\u4e00-\u9fa5]{2,6})\s+(.{1,})$/);
+      if(m2){
+        var label2=m2[1].trim();
+        var value2=m2[2].trim();
+        if(FIELD_LABELS.indexOf(label2)>=0&&hasUsefulContent(value2)){
+          preserved=value2;
+        }else{break}
+      }else{break}
+    }
+    /* 3) 去除行内的噪声子串 */
+    for(var k=0;k<OCR_NOISE_SUBSTR.length;k++){
+      preserved=preserved.split(OCR_NOISE_SUBSTR[k]).join('');
+    }
+    preserved=preserved.trim();
+    if(!preserved||isOcrNoiseLine(preserved))continue;
+    cleanLines.push(preserved);
+  }
+  return cleanLines.join('\n');
+}
+
+/* 同一图片识别出的多条"碎片房源"按"小区+楼幢+房号"分组合并 */
+function mergeSmartPropsByKey(props){
+  var groups={};
+  /* 第一遍：严格按"小区+楼号+房号"分组 */
+  for(var i=0;i<props.length;i++){
+    var p=props[i];
+    var keyParts=[];
+    if(p.community)keyParts.push(p.community.replace(/\s+/g,'').toLowerCase());
+    if(p.building)keyParts.push('b'+p.building);
+    if(p.room)keyParts.push('r'+p.room);
+    if(p.floor)keyParts.push('f'+p.floor);
+    /* 没有小区名也没楼号 → 无法合并，单独保留 */
+    if(keyParts.length===0){
+      p._uniqId='_orphan_'+i;
+      continue;
+    }
+    var key=keyParts.join('|');
+    if(!groups[key]){
+      groups[key]=p;
+      p._uniqId=key;
+    }else{
+      var existing=groups[key];
+      /* 把新条目的非空字段合并到现有条目（不覆盖已有） */
+      for(var f in p){
+        if(f==='_uniqId'||f==='_duplicate'||f==='_duplicateId'||f==='_rawLine'||f==='type')continue;
+        if(p[f]!==undefined&&p[f]!==''&&p[f]!==0&&p[f]!==null){
+          if(existing[f]===undefined||existing[f]===''||existing[f]===0||existing[f]===null){
+            existing[f]=p[f];
+          }else if(typeof p[f]==='string'&&existing[f].indexOf(p[f])<0&&p[f].length>existing[f].length){
+            /* 字符串型字段：新值更长且不包含现有值时替换 */
+            existing[f]=p[f];
+          }
+        }
+      }
+    }
+  }
+  var result=Object.values(groups);
+
+  /* 第二遍：智能借配 — 如果整批识别结果只有 1 个有小区名的"主组"，
+     把其他 orphan/楼号组都合并进去。
+     这是关键：OCR图片常把"小区名"和"楼号"识别在不同的行，
+     但它们其实属于同一套房。 */
+  var mainGroup=null;
+  var orphanOrBuildingOnly=[];
+  for(var ri=0;ri<result.length;ri++){
+    var item=result[ri];
+    if(item.community&&!item._uniqId.startsWith('_orphan_')){
+      if(!mainGroup)mainGroup=item;
+      else{
+        /* 多个有小区名的组，按小区名相似度比较，相似度高的合并到 mainGroup */
+        var isSimilar=item.community.replace(/\s+/g,'').toLowerCase()===
+                      mainGroup.community.replace(/\s+/g,'').toLowerCase();
+        /* OCR 错误可能把"柏悦"识别成"柏桕"，放宽相似度判断：编辑距离<=2 */
+        if(!isSimilar){
+          var a=item.community.replace(/\s+/g,'').toLowerCase();
+          var b=mainGroup.community.replace(/\s+/g,'').toLowerCase();
+          var dist=0;
+          if(Math.abs(a.length-b.length)<=2){
+            for(var di=0;di<Math.min(a.length,b.length);di++){
+              if(a[di]!==b[di])dist++;
+              if(dist>2)break;
+            }
+            isSimilar=dist<=2;
+          }
+        }
+        if(isSimilar){
+          /* 合并到 mainGroup（保留 mainGroup 的小区名） */
+          for(var mf in item){
+            if(mf==='_uniqId'||mf==='_duplicate'||mf==='_duplicateId'||mf==='type'||mf==='community')continue;
+            if(item[mf]!==undefined&&item[mf]!==''&&item[mf]!==0){
+              if(mainGroup[mf]===undefined||mainGroup[mf]===''||mainGroup[mf]===0){
+                mainGroup[mf]=item[mf];
+              }
+            }
+          }
+          result.splice(ri,1);ri--;
+        }
+      }
+    }else{
+      orphanOrBuildingOnly.push(item);
+    }
+  }
+  /* 如果有主组，把 orphan 和楼号组都合并进去（图片OCR里这些字段都属于同一套房） */
+  if(mainGroup){
+    for(var oi=0;oi<orphanOrBuildingOnly.length;oi++){
+      var orphan=orphanOrBuildingOnly[oi];
+      for(var of in orphan){
+        if(of==='_uniqId'||of==='_duplicate'||of==='_duplicateId'||of==='type'||of==='community')continue;
+        if(orphan[of]!==undefined&&orphan[of]!==''&&orphan[of]!==0){
+          if(mainGroup[of]===undefined||mainGroup[of]===''||mainGroup[of]===0){
+            mainGroup[of]=orphan[of];
+          }
+        }
+      }
+    }
+    /* 清理结果列表，只保留 mainGroup */
+    var filtered=[];
+    for(var fi=0;fi<result.length;fi++){
+      if(result[fi].community&&!result[fi]._uniqId.startsWith('_orphan_')){
+        /* 相似合并过的也跳过 */
+        var isMergedSimilar=false;
+        for(var fj=0;fj<result.length;fj++){
+          if(fj!==fi&&result[fj]===mainGroup)continue;
+        }
+        if(result[fi]!==mainGroup)continue;  /* 跳过被合并的 */
+      }
+      if(result[fi]===mainGroup)filtered.push(result[fi]);
+    }
+    result=filtered;
+  }
+  return result;
+}
+
 function parseSmartProp(text){
   if(!text||!text.trim())return [];
 
+  /* 0) OCR文本预处理：清洗UI噪声词（电话查看、详情查看、必填填写跟进等） */
+  var cleanedText=preprocessOcrText(text);
+  if(!cleanedText.trim())return [];
+
   /* 1) 先检测是否是结构化表格（第一行是表头 + 后续有多行数据） */
-  var rawLines=text.trim().split(/\n/);
+  var rawLines=cleanedText.split(/\n/);
   var firstLineFields=null;
   if(rawLines.length>0){
     var fl=rawLines[0].trim();
@@ -1525,6 +1747,7 @@ function parseSmartProp(text){
   /* 3) 走按行循环解析（处理表格、键值对、纯文本） */
   var lines=rawLines;
   var results=[];
+  var rawProps=[];  /* 收集每行识别出的碎片prop，最后按"小区+楼幢+房号"分组合并 */
   var headers=null;
   var dataRowCount=0;
   var currentIsNewdev=(S&&S.subtab==='newdev')||false;
@@ -1566,7 +1789,25 @@ function parseSmartProp(text){
     var lockedType=(currentTab==='newdev'||currentTab==='secondhand')?currentTab:'secondhand';
     var defaultType=lockedType;
 
-    var prop={title:'',community:'',developer:'',district:'',address:'',totalPrice:0,area:0,layout:'',floor:'',totalFloors:'',orientation:'',decoration:'',buildingAge:'',propertyRights:'',hasKey:false,viewingMethod:'',school:'',metro:'',ownerName:'',ownerPhone:'',contactName:'',contactPhone:'',commission:'',propertyType:'',openingDate:'',deliveryDate:'',availableLayouts:'',totalUnits:'',greenRate:'',plotRatio:'',type:defaultType,status:defaultType==='newdev'?'在售':'在售',tags:[],description:'',averagePrice:0, _rawLine:line};
+    var prop={title:'',community:'',developer:'',district:'',address:'',totalPrice:0,area:0,layout:'',floor:'',totalFloors:'',orientation:'',decoration:'',buildingAge:'',propertyRights:'',hasKey:false,viewingMethod:'',school:'',metro:'',ownerName:'',ownerPhone:'',contactName:'',contactPhone:'',commission:'',propertyType:'',openingDate:'',deliveryDate:'',availableLayouts:'',totalUnits:'',greenRate:'',plotRatio:'',type:defaultType,status:defaultType==='newdev'?'在售':'在售',tags:[],description:'',averagePrice:0,building:'',unit:'',room:'',_rawLine:line};
+
+    /* 增强：识别"楼幢-房号"格式（如 16-1704、3-2-501、5栋302 等），
+       把楼幢和房号拆出来作为分组键的关键字段 */
+    var roomPatterns=[
+      /(\d+)\s*[-\/－—]\s*(\d{2,5})/,  /* 16-1704、3/501、5-2-501 会优先匹配前面 */
+      /(\d+)\s*栋\s*(\d+)/,
+      /(\d+)\s*幢\s*(\d+)/,
+      /(\d+)\s*号楼\s*(\d+)/,
+      /(\d+)\s*座\s*(\d+)/
+    ];
+    for(var rp=0;rp<roomPatterns.length;rp++){
+      var rm=line.match(roomPatterns[rp]);
+      if(rm){
+        if(!prop.building)prop.building=rm[1];
+        if(!prop.room)prop.room=rm[2];
+        break;
+      }
+    }
 
     if(headers){
       for(var j=0;j<fields.length;j++){
@@ -1606,13 +1847,15 @@ function parseSmartProp(text){
       }
     }
 
-    if(prop.title||prop.ownerPhone||prop.community){
+    /* OCR 图片里识别出大量碎片信息（小区名、楼号、电话散落在多行），
+       不管这一行识别出了多少字段，都放到中间数组，最后按"小区+楼幢+房号+电话"分组合并 */
+    if(prop.title||prop.ownerPhone||prop.community||prop.building||prop.room||prop.area){
       /* 检查与已有楼盘按 title 去重（忽略大小写、空格） */
-      var normalizedTitle=(prop.title||'').replace(/\s+/g,'').toLowerCase();
+      var normalizedTitle=(prop.title||prop.community||'').replace(/\s+/g,'').toLowerCase();
       if(normalizedTitle){
         for(var ei=0;ei<S.properties.length;ei++){
           var ep=S.properties[ei];
-          var en=(ep.title||'').replace(/\s+/g,'').toLowerCase();
+          var en=((ep.title||ep.community||'')).replace(/\s+/g,'').toLowerCase();
           if(en&&en===normalizedTitle){
             prop._duplicate=true;
             prop._duplicateId=ep.id;
@@ -1620,7 +1863,18 @@ function parseSmartProp(text){
           }
         }
       }
-      results.push(prop);
+      rawProps.push(prop);
+    }
+  }
+
+  /* 关键步骤：同一图片内的多条碎片信息按"小区+楼幢+房号"分组合并 */
+  results=mergeSmartPropsByKey(rawProps);
+
+  /* title 字段缺失时尝试用合并后的 community 补上 */
+  for(var ri=0;ri<results.length;ri++){
+    var rp=results[ri];
+    if(!rp.title&&rp.community){
+      rp.title=rp.community+(rp.area?rp.area+'㎡':'')+(rp.layout?rp.layout:'')+(rp.building?' '+rp.building+'幢':'')+(rp.room?' '+rp.room:'');
     }
   }
 
