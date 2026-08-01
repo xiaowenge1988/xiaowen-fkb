@@ -36,7 +36,7 @@ var S={
   sort:'updatedAt', propSort:'updatedAt', txSort:'transactionDate', tab:'clients', subtab:'secondhand',
   curClientId:null, curPropId:null, curTxId:null, editClientId:null, editPropId:null, editTxId:null,
   editTags:[], editPhones:[], editAreas:[], editPropTags:[], editAreaSegs:[],
-  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:'', smartClients:[], clientView:'card', pinnedIds:[], propViewMode:'card', smartProps:[], pinnedPropIds:[], smartImages:[]
+  mediaList:[], mediaIdx:0, dueReminders:[], currentUser:null, allUsers:[], filterCreatedBy:'', smartClients:[], clientView:'card', pinnedIds:[], propViewMode:'card', smartProps:[], pinnedPropIds:[], smartImages:[], communityDetail:null, communityStatusFilter:'all'
 };
 
 /* ========== Storage (本地缓存 + 云端同步) ========== */
@@ -463,6 +463,7 @@ function switchSubtab(sub){
   var propFilterToggle=document.getElementById('propFilterToggle');
   if(propFilterToggle)propFilterToggle.style.display=(sub==='community')?'none':'';
   if(sub==='community'){
+    S.communityDetail=null;S.communityStatusFilter='all';
     renderCommunityList();
   }else{
     renderPropertyList();
@@ -1439,7 +1440,7 @@ function batchImportClients(){
 /* ========== Smart Property Input ========== */
 var DECORATIONS=['精装','简装','毛坯','豪装'];
 var ORIENTATIONS=['南北通透','朝南','朝北','朝东','朝西','东南','西南'];
-var PROP_STATUSES=['在售','已售','下架','待售','售罄'];
+var PROP_STATUSES=['在售','在租','空置待租','已租','暂缓','已售','下架','待售','售罄','到期可看'];
 
 function openSmartPropInput(mode,targetId){
   /* mode: 'batch'(默认批量新增/更新) | 'single'(更新单个楼盘) */
@@ -2722,7 +2723,7 @@ function batchImportProps(){
       }
     }
     target.updatedAt=now();
-    saveP();renderPropertyList();
+    saveP();if(S.subtab==='community'&&S.communityDetail){renderCommunityDetail()}else if(S.subtab==='community'){renderCommunityList()}else{renderPropertyList()}
     /* 上传提取的图片到楼盘相册 */
     var imgCount=S.smartImages.length;
     uploadSmartImagesToProp(target.id).then(function(n){
@@ -2812,7 +2813,7 @@ function batchImportProps(){
     }
   }
 
-  saveP();renderPropertyList();
+  saveP();if(S.subtab==='community'&&S.communityDetail){renderCommunityDetail()}else if(S.subtab==='community'){renderCommunityList()}else{renderPropertyList()}
   /* 如果有提取的图片，上传到第一个新增/更新的楼盘 */
   var msg='';
   if(imported>0)msg+='新增 '+imported+' 个';
@@ -3349,20 +3350,35 @@ function renderPropertyList(){
 /* ========== Community (二手小区) ========== */
 function renderCommunityList(){
   try{
+  /* 如果在详情模式，渲染详情页 */
+  if(S.communityDetail){
+    renderCommunityDetail();
+    return;
+  }
+  /* 恢复新增按钮文案 */
+  var addBtn0=document.getElementById('addPropBtn');
+  if(addBtn0){
+    addBtn0.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增小区';
+  }
   /* 获取所有小区名称（从二手房+租赁房中提取，加上已有的community类型记录） */
   var communityMap={};
   /* 先从 community 类型记录中获取已有概况 */
   S.properties.filter(function(p){return p.type==='community'}).forEach(function(c){
     var name=c.title||c.community||'';
-    if(name)communityMap[name]={info:c,forSale:0,forRent:0};
+    if(name)communityMap[name]={info:c,forSale:0,forRent:0,sold:0,rented:0,onHold:0,total:0};
   });
   /* 从二手房+租赁房中统计 */
   S.properties.filter(function(p){return p.type==='secondhand'||p.type==='rental'}).forEach(function(p){
     var name=p.community||'';
     if(!name)return;
-    if(!communityMap[name])communityMap[name]={info:null,forSale:0,forRent:0};
-    if(p.type==='secondhand')communityMap[name].forSale++;
-    if(p.type==='rental')communityMap[name].forRent++;
+    if(!communityMap[name])communityMap[name]={info:null,forSale:0,forRent:0,sold:0,rented:0,onHold:0,total:0};
+    communityMap[name].total++;
+    var st=p.status||'';
+    if(st==='在售'||st==='待售')communityMap[name].forSale++;
+    else if(st==='在租'||st==='空置待租'||st==='到期可看')communityMap[name].forRent++;
+    else if(st==='已售'||st==='售罄')communityMap[name].sold++;
+    else if(st==='已租')communityMap[name].rented++;
+    else if(st==='暂缓')communityMap[name].onHold++;
     /* 如果没有概况记录，从房源中提取区域信息 */
     if(!communityMap[name].info){
       communityMap[name].district=p.district||'';
@@ -3408,48 +3424,236 @@ function renderCommunityList(){
       feeStr=info.propertyFees.map(function(f){return esc(f.type||'')+':'+esc(f.fee||'')}).join('，');
     }
     var hasOverview=!!c.info;
-    return'<div class="community-card" data-community="'+esc(name)+'">'
+    return'<div class="community-card" data-community="'+esc(name)+'" style="cursor:pointer">'
       +'<div class="card-body" style="padding:16px">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
       +'<div><div class="card-title" style="font-size:1rem;font-weight:600">'+esc(name)+'</div>'
       +'<div class="card-info"><span>'+esc(locStr||'未分类区域')+'</span></div></div>'
-      +'<div style="display:flex;gap:6px">'
-      +'<span class="status-badge" data-status="在售" style="cursor:pointer" data-cview="secondhand" data-cname="'+esc(name)+'">在售 '+c.forSale+'</span>'
-      +'<span class="status-badge" data-status="已租" style="cursor:pointer" data-cview="rental" data-cname="'+esc(name)+'">在租 '+c.forRent+'</span>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(c.forSale?'<span class="status-badge" data-status="在售">在售 '+c.forSale+'</span>':'')
+      +(c.forRent?'<span class="status-badge" data-status="在租">在租 '+c.forRent+'</span>':'')
+      +(c.onHold?'<span class="status-badge" data-status="暂缓">暂缓 '+c.onHold+'</span>':'')
+      +(c.sold?'<span class="status-badge" data-status="已售">已售 '+c.sold+'</span>':'')
+      +(c.rented?'<span class="status-badge" data-status="已租">已租 '+c.rented+'</span>':'')
       +'</div></div>'
       +(overviewItems.length?'<div class="card-info" style="margin-bottom:4px">'+overviewItems.map(function(s){return'<span>'+s+'</span>'}).join('')+'</div>':'')
-      +(schoolStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">🏫 '+schoolStr+'</div>':'')
-      +(feeStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">💰 物业费：'+feeStr+'</div>':'')
-      +(!hasOverview?'<div style="font-size:.75rem;color:var(--warning);margin-bottom:4px">⚠ 未填写小区概况</div>':'')
-      +'<div class="card-actions">'
-      +'<button data-action="cedit" data-cname="'+esc(name)+'">'+(hasOverview?'编辑概况':'添加概况')+'</button>'
-      +'<button data-action="csale" data-cname="'+esc(name)+'">看在售</button>'
-      +'<button data-action="crent" data-cname="'+esc(name)+'">看在租</button>'
-      +'</div></div></div>';
+      +(schoolStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">'+schoolStr+'</div>':'')
+      +(feeStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">物业费：'+feeStr+'</div>':'')
+      +(!hasOverview?'<div style="font-size:.75rem;color:var(--warning);margin-bottom:4px">未填写小区概况，点击进入可补充</div>':'')
+      +'<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">共 '+c.total+' 套房源 · 点击查看详情</div>'
+      +'</div></div>';
   }).join('');
-  /* 绑定事件 */
-  grid.querySelectorAll('.community-card .card-actions button').forEach(function(btn){
-    btn.addEventListener('click',function(e){
-      e.stopPropagation();
-      var a=btn.getAttribute('data-action');
-      var name=btn.getAttribute('data-cname');
-      if(a==='cedit')openCommunityForm(name);
-      if(a==='csale'){S.propFilters.community=name;switchSubtab('secondhand');var el=document.getElementById('pfFilterCommunity');if(el)el.value=name;}
-      if(a==='crent'){S.propFilters.community=name;switchSubtab('rental');var el2=document.getElementById('pfFilterCommunity');if(el2)el2.value=name;}
-    });
-  });
-  grid.querySelectorAll('[data-cview]').forEach(function(el){
-    el.addEventListener('click',function(e){
-      e.stopPropagation();
-      var name=el.getAttribute('data-cname');
-      var view=el.getAttribute('data-cview');
-      S.propFilters.community=name;
-      switchSubtab(view);
-      var inp=document.getElementById('pfFilterCommunity');
-      if(inp)inp.value=name;
+  /* 绑定卡片点击事件 → 进入详情页 */
+  grid.querySelectorAll('.community-card').forEach(function(card){
+    card.addEventListener('click',function(e){
+      if(e.target.closest('button'))return;
+      var name=card.getAttribute('data-community');
+      S.communityDetail=name;
+      S.communityStatusFilter='all';
+      renderCommunityDetail();
     });
   });
   }catch(err){console.error('[renderCommunityList]',err);toast('小区列表加载失败: '+err.message,'error')}
+}
+
+/* 小区详情页 */
+function renderCommunityDetail(){
+  try{
+  var name=S.communityDetail;
+  if(!name){renderCommunityList();return}
+  /* 获取小区概况 */
+  var info=S.properties.find(function(p){return p.type==='community'&&(p.title===name||p.community===name)})||{};
+  /* 获取该小区所有房源 */
+  var props=S.properties.filter(function(p){
+    return(p.type==='secondhand'||p.type==='rental')&&(p.community||'')===name;
+  });
+  /* 统计各状态数量 */
+  var stats={all:props.length,onSale:0,onRent:0,onHold:0,sold:0,rented:0};
+  props.forEach(function(p){
+    var st=p.status||'';
+    if(st==='在售'||st==='待售')stats.onSale++;
+    else if(st==='在租'||st==='空置待租'||st==='到期可看')stats.onRent++;
+    else if(st==='已售'||st==='售罄')stats.sold++;
+    else if(st==='已租')stats.rented++;
+    else if(st==='暂缓')stats.onHold++;
+  });
+  /* 按状态筛选 */
+  var filtered=props;
+  var sf=S.communityStatusFilter;
+  if(sf==='onSale')filtered=props.filter(function(p){return['在售','待售'].indexOf(p.status||'')>=0});
+  else if(sf==='onRent')filtered=props.filter(function(p){return['在租','空置待租','到期可看'].indexOf(p.status||'')>=0});
+  else if(sf==='onHold')filtered=props.filter(function(p){return(p.status||'')==='暂缓'});
+  else if(sf==='sold')filtered=props.filter(function(p){return['已售','售罄'].indexOf(p.status||'')>=0});
+  else if(sf==='rented')filtered=props.filter(function(p){return(p.status||'')==='已租'});
+
+  var grid=document.getElementById('propertyGrid');
+  var table=document.getElementById('propertyTable');
+  if(grid)grid.style.display='';
+  if(table)table.style.display='none';
+
+  /* 构建详情页HTML */
+  /* 更新新增按钮文案 */
+  var addBtn=document.getElementById('addPropBtn');
+  if(addBtn){
+    addBtn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增房源';
+  }
+  var district=info.district||'';
+  var block=info.block||'';
+  var locStr=district+(block?('·'+block):'');
+  /* 概况信息 */
+  var overviewItems=[];
+  if(info.buildingCount)overviewItems.push('楼幢：'+esc(info.buildingCount));
+  if(info.householdCount)overviewItems.push('户数：'+esc(info.householdCount));
+  if(info.buildingAge)overviewItems.push('房龄：'+esc(info.buildingAge));
+  if(info.street)overviewItems.push('街道：'+esc(info.street));
+  if(info.neighborhood)overviewItems.push('社区：'+esc(info.neighborhood));
+  if(info.propertyManagement)overviewItems.push('物业：'+esc(info.propertyManagement));
+  var schoolStr='';
+  if(info.kindergarten||info.primarySchool||info.middleSchool){
+    var schools=[];
+    if(info.kindergarten)schools.push('幼儿园：'+esc(info.kindergarten));
+    if(info.primarySchool)schools.push('小学：'+esc(info.primarySchool));
+    if(info.middleSchool)schools.push('中学：'+esc(info.middleSchool));
+    schoolStr=schools.join(' / ');
+  }
+  var feeStr='';
+  if(info.propertyFees&&info.propertyFees.length>0){
+    feeStr=info.propertyFees.map(function(f){return esc(f.type||'')+':'+esc(f.fee||'')}).join('，');
+  }
+  var hasOverview=!!info.id;
+
+  var html='<div style="margin-bottom:16px">'
+    /* 返回按钮 + 小区名 */
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
+    +'<button id="cmBackBtn" style="border:1px solid var(--border);background:var(--bg-secondary);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;display:flex;align-items:center;gap:4px">'
+    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>返回小区列表</button>'
+    +'<div style="flex:1"><div style="font-size:1.125rem;font-weight:600">'+esc(name)+'</div>'
+    +'<div style="font-size:.75rem;color:var(--text-muted)">'+esc(locStr||'未分类区域')+'</div></div>'
+    +'<button id="cmEditBtn" style="border:1px solid var(--border);background:var(--bg-secondary);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer">'+(hasOverview?'编辑概况':'添加概况')+'</button>'
+    +'</div>'
+    /* 概况信息 */
+    +(overviewItems.length||schoolStr||feeStr?
+      '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-bottom:12px">'
+      +(overviewItems.length?'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px;font-size:.8125rem;color:var(--text-secondary)">'+overviewItems.map(function(s){return'<span>'+s+'</span>'}).join('')+'</div>':'')
+      +(schoolStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">'+schoolStr+'</div>':'')
+      +(feeStr?'<div style="font-size:.75rem;color:var(--text-secondary)">物业费：'+feeStr+'</div>':'')
+      +'</div>'
+      :'<div style="background:var(--warning-light);border-radius:8px;padding:12px;margin-bottom:12px;font-size:.8125rem;color:var(--warning)">该小区还没有概况信息，点击右上角"添加概况"补充</div>')
+    /* 状态筛选按钮 */
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+    +cmFilterBtn('all','全部',stats.all,sf)
+    +cmFilterBtn('onSale','在售',stats.onSale,sf)
+    +cmFilterBtn('onRent','在租',stats.onRent,sf)
+    +cmFilterBtn('onHold','暂缓',stats.onHold,sf)
+    +cmFilterBtn('sold','已售',stats.sold,sf)
+    +cmFilterBtn('rented','已租',stats.rented,sf)
+    +'</div>'
+    +'</div>';
+
+  document.getElementById('propResultCount').innerHTML=html;
+  /* 返回按钮 */
+  document.getElementById('cmBackBtn').addEventListener('click',function(){
+    S.communityDetail=null;S.communityStatusFilter='all';
+    renderCommunityList();
+  });
+  /* 编辑概况按钮 */
+  var editBtn=document.getElementById('cmEditBtn');
+  if(editBtn)editBtn.addEventListener('click',function(){openCommunityForm(name)});
+  /* 状态筛选按钮 */
+  document.querySelectorAll('[data-cmfilter]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      S.communityStatusFilter=btn.getAttribute('data-cmfilter');
+      renderCommunityDetail();
+    });
+  });
+
+  /* 渲染房源列表 */
+  if(filtered.length===0){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><h3>该状态下暂无房源</h3><p>切换其他状态查看，或点击"新增房源"添加</p></div>';
+    return;
+  }
+  /* 按更新时间排序 */
+  filtered.sort(function(a,b){return(b.updatedAt||0)-(a.updatedAt||0)});
+  grid.innerHTML=filtered.map(function(p){
+    var price;
+    if(p.type==='rental'){
+      price=p.rentPrice?p.rentPrice+'<span class="unit">元/月</span>':'面议';
+    }else if(p.type==='secondhand'){
+      price=p.totalPrice?p.totalPrice+'<span class="unit">万</span>':'面议';
+    }else{
+      price=p.averagePrice?p.averagePrice+'<span class="unit">元/㎡</span>':'面议';
+    }
+    var typeLabel=p.type==='secondhand'?'二手房':(p.type==='rental'?'租赁':'新楼盘');
+    var info;
+    if(p.type==='rental'){
+      info=[p.area?p.area+'㎡':'',p.layout||'',p.depositType||'',p.rentType||''].filter(Boolean);
+    }else if(p.type==='secondhand'){
+      info=[p.area?p.area+'㎡':'',p.layout||'',p.orientation||''].filter(Boolean);
+      var locStr2=[p.building,p.unit,p.room].filter(Boolean).join(' ');
+      if(locStr2)info.unshift(locStr2);
+    }else{
+      info=[p.developer||'',p.availableLayouts||''].filter(Boolean);
+    }
+    var tags=(p.tags||[]).map(function(t){return'<span class="client-tag">'+esc(t)+'</span>'}).join('');
+    var propPinned=(S.pinnedPropIds||[]).indexOf(p.id)>=0;
+    var titleDisplay=[p.building,p.unit,p.room].filter(Boolean).join(' ')||p.title||'未命名';
+    return'<div class="property-card'+(propPinned?' pinned':'')+'" data-status="'+esc(p.status)+'" data-id="'+p.id+'">'
+      +(propPinned?'<div style="position:absolute;top:8px;right:8px;z-index:2;font-size:1rem">⭐</div>':'')
+      +'<div class="card-thumb no-img" data-thumb="'+p.id+'"><span class="type-label">'+typeLabel+'</span><span class="media-count" data-media-count="'+p.id+'" style="display:none"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="mc-num">0</span></span></div>'
+      +'<div class="card-body"><div class="card-title">'+esc(titleDisplay)+'</div><div class="card-price">'+price+'</div>'
+      +'<div class="card-info">'+info.map(function(i){return'<span>'+esc(i)+'</span>'}).join('')+'</div>'
+      +(tags?'<div class="prop-tags">'+tags+'</div>':'')
+      +'<div class="card-info"><span>'+esc(p.district||'')+(p.block?('·'+esc(p.block)):'')+'</span><span class="status-badge" data-status="'+esc(p.status)+'">'+esc(p.status)+'</span></div>'
+      +'<div class="card-actions"><button data-action="pview" data-id="'+p.id+'">详情</button><button data-action="pshare" data-id="'+p.id+'">分享</button><button data-action="ppin" data-id="'+p.id+'" title="'+(propPinned?'取消重点':'标为重点')+'">'+(propPinned?'⭐取消':'⭐重点')+'</button><button data-action="pedit" data-id="'+p.id+'">编辑</button></div>'
+      +'</div></div>';
+  }).join('');
+  /* 绑定房源卡片事件 */
+  grid.querySelectorAll('.property-card').forEach(function(card){
+    card.addEventListener('click',function(e){if(e.target.closest('button'))return;showPropertyDetail(card.getAttribute('data-id'))});
+  });
+  grid.querySelectorAll('.card-actions button').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();var a=btn.getAttribute('data-action'),id=btn.getAttribute('data-id');
+      if(a==='pview')showPropertyDetail(id);
+      if(a==='pedit')openPropertyForm(id);
+      if(a==='pshare')copyPropertyInfo(id);
+      if(a==='ppin'){
+        S.pinnedPropIds=S.pinnedPropIds||[];
+        var idx=S.pinnedPropIds.indexOf(id);
+        if(idx>=0)S.pinnedPropIds.splice(idx,1);
+        else S.pinnedPropIds.push(id);
+        renderCommunityDetail();
+        toast(idx>=0?'已取消重点房源':'已标为重点房源','success');
+      }
+    });
+  });
+  /* 异步加载缩略图 */
+  filtered.forEach(function(p){
+    MediaDB.list(p.id).then(function(media){
+      var img;
+      if(p.coverMediaId){img=media.find(function(m){return m.id===p.coverMediaId})}
+      if(!img){img=media.find(function(m){return m.type==='image'})}
+      var el=document.querySelector('[data-thumb="'+p.id+'"]');
+      if(img&&el){el.style.backgroundImage='url('+img.dataUrl+')';el.classList.remove('no-img')}
+      /* 更新媒体计数 */
+      var mcEl=document.querySelector('[data-media-count="'+p.id+'"]');
+      if(mcEl&&media.length>0){
+        mcEl.style.display='';
+        var numEl=mcEl.querySelector('.mc-num');
+        if(numEl)numEl.textContent=media.length;
+      }
+    }).catch(function(){});
+  });
+  }catch(err){console.error('[renderCommunityDetail]',err);toast('小区详情加载失败: '+err.message,'error')}
+}
+
+/* 小区详情页状态筛选按钮 */
+function cmFilterBtn(key,label,count,current){
+  var active=(current===key);
+  var style=active
+    ?'background:var(--primary);color:#fff;border:1px solid var(--primary)'
+    :'background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border)';
+  return'<button data-cmfilter="'+key+'" style="'+style+';padding:5px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;font-weight:'+(active?'600':'400')+'">'+label+' '+count+'</button>';
 }
 
 /* 打开小区概况编辑表单 */
@@ -4003,7 +4207,7 @@ function openPropertyForm(id){
   var p=id?findProp(id):{};
   var type=id?p.type:(S.subtab==='community'?'secondhand':S.subtab);
   if(type==='community')type='secondhand';
-  document.getElementById('propFormTitle').textContent=id?(type==='newdev'?'编辑楼盘':(type==='rental'?'编辑出租房':'编辑房源')):(S.subtab==='newdev'?'新增楼盘':(S.subtab==='rental'?'新增出租房':(S.subtab==='community'?'新增小区(房源)':'新增二手房')));
+  document.getElementById('propFormTitle').textContent=id?(type==='newdev'?'编辑楼盘':(type==='rental'?'编辑出租房':'编辑房源')):(S.subtab==='newdev'?'新增楼盘':(S.subtab==='rental'?'新增出租房':((S.subtab==='community'&&S.communityDetail)?'新增房源':'新增二手房')));
   document.getElementById('pfId').value=id||'';
   document.getElementById('pfType').value=type;
   updatePropFormFields(type);
@@ -4216,7 +4420,7 @@ function saveProperty(){
   p.tags=S.editPropTags.slice();p.showroomAreas=S.editAreaSegs.slice();p.updatedAt=now();
   if(!isEdit){p.id=uuid();p.createdAt=now();p.linkedClientIds=[];S.properties.push(p)}
   saveP();closeModal('propFormModal');
-  if(S.subtab==='community'){renderCommunityList()}else{renderPropertyList()}
+  if(S.subtab==='community'){if(S.communityDetail){renderCommunityDetail()}else{renderCommunityList()}}else{renderPropertyList()}
   toast(isEdit?'房源已更新':'房源已添加','success');
 }
 
@@ -5252,10 +5456,19 @@ function setupHandlers(){
     e.target.value='';
   });
   document.getElementById('addPropBtn').addEventListener('click',function(){
-    if(S.subtab==='community'){openCommunityForm('')}else{openPropertyForm()}
+    if(S.subtab==='community'&&S.communityDetail){
+      /* 在小区详情页，新增房源时预填小区名 */
+      openPropertyForm();
+      var cmInput=document.getElementById('pfCommunity');
+      if(cmInput)cmInput.value=S.communityDetail;
+    }else if(S.subtab==='community'){
+      openCommunityForm('');
+    }else{
+      openPropertyForm();
+    }
   });
   document.getElementById('smartPropInputBtn').addEventListener('click',function(){
-    if(S.subtab==='community'){openCommunitySmartInput()}else{openSmartPropInput()}
+    if(S.subtab==='community'&&!S.communityDetail){openCommunitySmartInput()}else{openSmartPropInput()}
   });
   /* smart prop paste: capture images from clipboard */
   document.getElementById('smartPropArea').addEventListener('paste',function(e){

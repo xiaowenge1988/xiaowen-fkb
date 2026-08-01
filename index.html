@@ -152,6 +152,10 @@ ul{list-style:none}
 .status-badge[data-status="下架"]{background:var(--danger-light);color:var(--danger)}
 .status-badge[data-status="待售"]{background:var(--warning-light);color:var(--warning)}
 .status-badge[data-status="售罄"]{background:var(--gray-100);color:var(--gray-400)}
+.status-badge[data-status="在租"]{background:var(--info-light);color:var(--info)}
+.status-badge[data-status="空置待租"]{background:var(--info-light);color:var(--info)}
+.status-badge[data-status="已租"]{background:var(--gray-100);color:var(--gray-500)}
+.status-badge[data-status="到期可看"]{background:var(--warning-light);color:var(--warning)}
 .client-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
 .client-tag{background:var(--gray-100);color:var(--gray-600);padding:1px 6px;border-radius:4px;font-size:.625rem}
 .client-tag.custom{background:var(--teal-light);color:var(--teal)}
@@ -1142,7 +1146,7 @@ ul{list-style:none}
               </div>
               <div class="hint">添加面积段后，可在房源详情中按面积段上传样板房视频</div>
             </div>
-            <div class="form-field"><label>状态</label><select id="pfStatus"><option>在售</option><option>已售</option><option>下架</option><option>待售</option><option>售罄</option><option>在租</option><option>空置待租</option><option>已租</option><option>到期可看</option></select></div>
+            <div class="form-field"><label>状态</label><select id="pfStatus"><option>在售</option><option>在租</option><option>空置待租</option><option>暂缓</option><option>已售</option><option>已租</option><option>到期可看</option><option>下架</option><option>待售</option><option>售罄</option></select></div>
           </div>
           <div class="form-field"><label>房源标签</label><div class="tag-input-container" id="pfTagContainer"><input type="text" id="pfTagInput" placeholder="输入后回车添加，如：精装、学区房"></div></div>
           <div class="form-field"><label>房源描述</label><textarea id="pfDesc" placeholder="房源亮点、周边配套、交通等"></textarea></div>
