@@ -457,9 +457,11 @@ function switchSubtab(sub){
   updateFilterVisibility(sub);
   /* 更新板块下拉选项 */
   updateBlockOptions(sub);
-  /* 小区tab隐藏视图切换和筛选栏 */
+  /* 小区tab隐藏视图切换和筛选栏（整个筛选区都要隐藏，不只是按钮） */
   var propViewToggle=document.getElementById('propViewToggle');
   if(propViewToggle)propViewToggle.style.display=(sub==='community')?'none':'';
+  var propFilterBar=document.getElementById('propFilterBar');
+  if(propFilterBar)propFilterBar.style.display=(sub==='community')?'none':'';
   var propFilterToggle=document.getElementById('propFilterToggle');
   if(propFilterToggle)propFilterToggle.style.display=(sub==='community')?'none':'';
   if(sub==='community'){
@@ -3455,8 +3457,13 @@ function renderCommunityList(){
   });
   names=filteredNames;
 
-  /* ========== 渲染筛选栏 ========== */
+  /* ========== 渲染筛选栏（带下拉折叠按钮） ========== */
   var filterBar='<div class="filter-bar" style="margin-bottom:12px">'
+    +'<button class="filter-toggle" id="cmFilterToggle">'
+    +'<span>小区筛选</span>'
+    +'<svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>'
+    +'</button>'
+    +'<div class="filter-body" id="cmFilterBody">'
     +'<div class="filter-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
     +'<div class="filter-group" style="display:flex;align-items:center;gap:4px"><label style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">区域</label>'
     +'<select id="cmFilterDistrict" style="height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:.8125rem;background:#fff"><option value="">全部</option>'
@@ -3481,7 +3488,7 @@ function renderCommunityList(){
     +'<option value="props"'+(cf.sort==='props'?' selected':'')+'>房源数</option>'
     +'</select></div>'
     +(cf.district||cf.status||cf.keyword?'<button id="cmFilterReset" style="height:32px;padding:0 10px;border:1px solid var(--border);background:#fff;border-radius:6px;font-size:.75rem;cursor:pointer;color:var(--text-secondary)">重置</button>':'')
-    +'</div></div>';
+    +'</div></div></div>';
 
   document.getElementById('propResultCount').innerHTML=filterBar
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 4px"><div style="font-size:.875rem;color:var(--text-secondary)">共 <b style="color:var(--primary);font-size:1rem">'+names.length+'</b> 个小区'+(names.length!==allNames.length?' <span style="font-size:.75rem;color:var(--text-muted)">/ 全部 '+allNames.length+' 个</span>':'')+'</div></div>';
@@ -3492,6 +3499,18 @@ function renderCommunityList(){
   var kwEl=document.getElementById('cmFilterKeyword');
   var sortEl=document.getElementById('cmFilterSort');
   var resetEl=document.getElementById('cmFilterReset');
+  /* 下拉折叠按钮 */
+  var cmToggle=document.getElementById('cmFilterToggle');
+  var cmBody=document.getElementById('cmFilterBody');
+  if(cmToggle&&cmBody){
+    /* 有筛选条件时默认展开，否则收起 */
+    var hasFilter=cf.district||cf.status||cf.keyword;
+    if(hasFilter){cmToggle.classList.add('open');cmBody.classList.add('open')}
+    cmToggle.addEventListener('click',function(){
+      cmToggle.classList.toggle('open');
+      cmBody.classList.toggle('open');
+    });
+  }
   if(distEl)distEl.addEventListener('change',function(){S.communityFilters.district=this.value;renderCommunityList()});
   if(stEl)stEl.addEventListener('change',function(){S.communityFilters.status=this.value;renderCommunityList()});
   if(sortEl)sortEl.addEventListener('change',function(){S.communityFilters.sort=this.value;renderCommunityList()});
