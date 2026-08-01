@@ -3634,17 +3634,26 @@ function renderCommunityDetail(){
   }
   var hasOverview=!!info.id;
 
-  var html='<div style="margin-bottom:16px">'
-    /* 返回按钮 + 小区名 + 操作按钮 */
-    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:14px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:10px;color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.15)">'
-    +'<button id="cmBackBtn" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;display:flex;align-items:center;gap:4px;color:#fff;backdrop-filter:blur(8px)">'
-    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>返回</button>'
-    +'<div style="flex:1;min-width:0"><div style="font-size:1.125rem;font-weight:600;display:flex;align-items:center;gap:6px">'
-    +'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
-    +esc(name)+'</div>'
-    +'<div style="font-size:.75rem;opacity:.85;margin-top:2px">'+esc(locStr||'未分类区域')+'</div></div>'
-    +'<button id="cmEditBtn" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;color:#fff;backdrop-filter:blur(8px)">'+(hasOverview?'编辑概况':'添加概况')+'</button>'
-    +'</div>';
+  var headerHtml='<div style="margin-bottom:14px">'
+    /* 返回按钮 + 操作按钮（第一行：左返回 右编辑） */
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">'
+    +'<button id="cmBackBtn" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:#fff;padding:7px 14px;border-radius:8px;font-size:.8125rem;cursor:pointer;color:var(--text-secondary);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.04)">'
+    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>返回列表</button>'
+    +'<button id="cmEditBtn" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--primary);background:var(--primary);padding:7px 14px;border-radius:8px;font-size:.8125rem;cursor:pointer;color:#fff;font-weight:500;box-shadow:0 2px 6px rgba(37,99,235,.25)">'+(hasOverview?'✎ 编辑概况':'＋ 添加概况')+'</button>'
+    +'</div>'
+    /* 小区名标题（第二行：图标+标题+副标题） */
+    +'<div style="background:linear-gradient(135deg,var(--primary) 0%,#6366f1 100%);border-radius:12px;padding:14px 16px;color:#fff;box-shadow:0 4px 14px rgba(37,99,235,.18);position:relative;overflow:hidden">'
+    +'<div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;background:rgba(255,255,255,.08);border-radius:50%"></div>'
+    +'<div style="position:absolute;bottom:-30px;right:40px;width:60px;height:60px;background:rgba(255,255,255,.06);border-radius:50%"></div>'
+    +'<div style="position:relative;display:flex;align-items:flex-start;gap:10px">'
+    +'<span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;background:rgba(255,255,255,.2);border-radius:8px;flex-shrink:0;backdrop-filter:blur(8px)">'
+    +'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
+    +'</span>'
+    +'<div style="flex:1;min-width:0;overflow:hidden">'
+    +'<div style="font-size:1.125rem;font-weight:600;line-height:1.3;word-break:break-all;overflow-wrap:break-word">'+esc(name)+'</div>'
+    +'<div style="font-size:.75rem;opacity:.9;margin-top:4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
+    +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>'
+    +esc(locStr||'未分类区域')+'</div></div></div></div>';
 
   /* ========== 概况信息分组卡片 ========== */
   if(hasOverview||overviewItems.length||schoolStr||feeStr){
@@ -3656,15 +3665,15 @@ function renderCommunityDetail(){
     if(info.street)basicInfo.push({label:'所在街道',value:info.street,icon:''});
     if(info.neighborhood)basicInfo.push({label:'所属社区',value:info.neighborhood,icon:''});
 
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">';
+    headerHtml+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">';
     /* 基本信息卡片 */
     if(basicInfo.length){
-      html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+      headerHtml+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
         +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">'
-        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:var(--primary-light);color:var(--primary);font-size:.75rem">ℹ</span>'
-        +'<span style="font-size:.875rem;font-weight:600;color:var(--text-primary)">基本信息</span></div>'
-        +'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">'
-        +basicInfo.map(function(it){return'<div><div style="font-size:.6875rem;color:var(--text-muted);margin-bottom:2px">'+esc(it.label)+'</div><div style="font-size:.8125rem;font-weight:500;color:var(--text-primary)">'+esc(it.value)+'</div></div>'}).join('')
+        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--primary-light);color:var(--primary);font-size:.6875rem">ℹ</span>'
+        +'<span style="font-size:.8125rem;font-weight:600;color:var(--text-primary)">基本信息</span></div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+        +basicInfo.map(function(it){return'<div><div style="font-size:.6875rem;color:var(--text-muted);margin-bottom:2px">'+esc(it.label)+'</div><div style="font-size:.8125rem;font-weight:500;color:var(--text-primary);word-break:break-all;overflow-wrap:break-word">'+esc(it.value)+'</div></div>'}).join('')
         +'</div></div>';
     }
     /* 教育配套卡片 */
@@ -3673,43 +3682,50 @@ function renderCommunityDetail(){
       if(info.kindergarten)schoolItems.push({label:'幼儿园',value:info.kindergarten,icon:''});
       if(info.primarySchool)schoolItems.push({label:'小学',value:info.primarySchool,icon:''});
       if(info.middleSchool)schoolItems.push({label:'中学',value:info.middleSchool,icon:''});
-      html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+      headerHtml+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
         +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">'
-        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:#fef3c7;color:#d97706;font-size:.75rem">🎓</span>'
-        +'<span style="font-size:.875rem;font-weight:600;color:var(--text-primary)">教育配套</span></div>'
+        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#fef3c7;color:#d97706;font-size:.6875rem">🎓</span>'
+        +'<span style="font-size:.8125rem;font-weight:600;color:var(--text-primary)">教育配套</span></div>'
         +'<div style="display:flex;flex-direction:column;gap:8px">'
-        +schoolItems.map(function(it){return'<div><div style="font-size:.6875rem;color:var(--text-muted);margin-bottom:2px">'+esc(it.label)+'</div><div style="font-size:.8125rem;font-weight:500;color:var(--text-primary)">'+esc(it.value)+'</div></div>'}).join('')
+        +schoolItems.map(function(it){return'<div><div style="font-size:.6875rem;color:var(--text-muted);margin-bottom:2px">'+esc(it.label)+'</div><div style="font-size:.8125rem;font-weight:500;color:var(--text-primary);word-break:break-all;overflow-wrap:break-word">'+esc(it.value)+'</div></div>'}).join('')
         +'</div></div>';
     }
     /* 物业费卡片 */
     if(feeStr){
-      html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+      headerHtml+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
         +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">'
-        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:#d1fae5;color:#059669;font-size:.75rem">💰</span>'
-        +'<span style="font-size:.875rem;font-weight:600;color:var(--text-primary)">物业费</span></div>'
-        +'<div style="font-size:.8125rem;color:var(--text-primary)">'+feeStr+'</div></div>';
+        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#d1fae5;color:#059669;font-size:.6875rem">💰</span>'
+        +'<span style="font-size:.8125rem;font-weight:600;color:var(--text-primary)">物业费</span></div>'
+        +'<div style="font-size:.8125rem;color:var(--text-primary);word-break:break-all;overflow-wrap:break-word">'+feeStr+'</div></div>';
     }
-    html+='</div>';
+    headerHtml+='</div>';
   }else{
-    html+='<div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:10px;padding:16px 18px;margin-bottom:12px;font-size:.875rem;color:#92400e;display:flex;align-items:center;gap:10px">'
-      +'<span style="font-size:1.25rem">⚠</span>'
+    headerHtml+='<div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:10px;padding:14px 16px;margin-bottom:12px;font-size:.8125rem;color:#92400e;display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:1.125rem">⚠</span>'
       +'<span>该小区还没有概况信息，点击右上角"添加概况"补充楼幢、户数、物业等基础信息</span></div>';
   }
 
-  /* 状态筛选按钮 */
-  html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
-    +'<span style="font-size:.75rem;color:var(--text-muted);font-weight:500">房源状态：</span>'
+  /* 状态筛选按钮 — 手机端横向滚动 */
+  headerHtml+='<div class="cm-filter-bar" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    +'<span style="font-size:.8125rem;color:var(--text-primary);font-weight:600">房源状态</span>'
+    +'<span style="font-size:.75rem;color:var(--text-muted)">共 <b style="color:var(--primary)">'+stats.all+'</b> 套</span>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px" class="cm-filter-scroll">'
     +cmFilterBtn('all','全部',stats.all,sf)
     +cmFilterBtn('onSale','在售',stats.onSale,sf)
     +cmFilterBtn('onRent','在租',stats.onRent,sf)
     +cmFilterBtn('onHold','暂缓',stats.onHold,sf)
     +cmFilterBtn('sold','已售',stats.sold,sf)
     +cmFilterBtn('rented','已租',stats.rented,sf)
-    +'<span style="margin-left:auto;font-size:.75rem;color:var(--text-muted)">共 '+stats.all+' 套</span>'
-    +'</div>'
+    +'</div></div>'
     +'</div>';
 
-  document.getElementById('propResultCount').innerHTML=html;
+  /* 统计数字放到 propResultCount（保持工具栏整齐） */
+  document.getElementById('propResultCount').innerHTML='共 <b>'+stats.all+'</b> 套房源';
+
+  /* 详情页内容写到 propertyGrid — 不和工具栏混在一起 */
+  grid.innerHTML=headerHtml
   /* 返回按钮 */
   document.getElementById('cmBackBtn').addEventListener('click',function(){
     S.communityDetail=null;S.communityStatusFilter='all';
@@ -3728,12 +3744,12 @@ function renderCommunityDetail(){
 
   /* 渲染房源列表 */
   if(filtered.length===0){
-    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><h3>该状态下暂无房源</h3><p>切换其他状态查看，或点击"新增房源"添加</p></div>';
+    grid.innerHTML=headerHtml+'<div class="empty" style="grid-column:1/-1;margin-top:8px"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><h3>该状态下暂无房源</h3><p>切换其他状态查看，或点击"新增房源"添加</p></div>';
     return;
   }
   /* 按更新时间排序 */
   filtered.sort(function(a,b){return(b.updatedAt||0)-(a.updatedAt||0)});
-  grid.innerHTML=filtered.map(function(p){
+  grid.innerHTML=headerHtml+filtered.map(function(p){
     var price;
     if(p.type==='rental'){
       price=p.rentPrice?p.rentPrice+'<span class="unit">元/月</span>':'面议';

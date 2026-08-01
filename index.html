@@ -60,14 +60,17 @@ ul{list-style:none}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* ===== Mobile Header ===== */
-.mobile-header{display:none;position:sticky;top:0;z-index:100;background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.3)}
-.mobile-header-inner{display:flex;align-items:center;justify-content:space-between;min-height:50px;padding:0 12px}
-.mobile-header-logo{display:flex;align-items:center;gap:6px}
-.mobile-header-logo img{width:28px;height:28px;border-radius:7px}
-.mobile-header-logo span{font-size:1rem;font-weight:700}
-.mobile-header-actions{display:flex;align-items:center;gap:8px}
-.mobile-header-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
-.mobile-header-btn:active{background:rgba(255,255,255,.3)}
+.mobile-header{display:none;position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#3b82f6 100%);color:#fff;box-shadow:0 2px 12px rgba(37,99,235,.3);position:relative;overflow:hidden}
+.mobile-header::before{content:"";position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:radial-gradient(circle,rgba(255,255,255,.15) 0%,transparent 70%);pointer-events:none}
+.mobile-header::after{content:"";position:absolute;bottom:-20px;left:30%;width:80px;height:80px;background:radial-gradient(circle,rgba(255,255,255,.08) 0%,transparent 70%);pointer-events:none}
+.mobile-header-inner{display:flex;align-items:center;justify-content:space-between;min-height:52px;padding:0 14px;position:relative;z-index:1}
+.mobile-header-logo{display:flex;align-items:center;gap:8px}
+.mobile-header-logo-icon{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);box-shadow:0 2px 6px rgba(0,0,0,.1)}
+.mobile-header-logo-icon svg{width:18px;height:18px}
+.mobile-header-logo span{font-size:1.0625rem;font-weight:700;letter-spacing:.5px}
+.mobile-header-actions{display:flex;align-items:center;gap:6px}
+.mobile-header-btn{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;transition:.15s}
+.mobile-header-btn:active{background:rgba(255,255,255,.3);transform:scale(.95)}
 
 /* ===== Bottom Nav ===== */
 .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--gray-200);z-index:100;box-shadow:0 -2px 10px rgba(0,0,0,.06);padding-bottom:env(safe-area-inset-bottom)}
@@ -438,6 +441,7 @@ ul{list-style:none}
   .dash-grid{grid-template-columns:1fr}
   .showroom-subsections{grid-template-columns:1fr}
   .fab{bottom:72px}
+  .client-grid,.property-grid{padding-bottom:120px}
 }
 @media(min-width:1024px){
   .fab{display:none}
@@ -782,6 +786,7 @@ ul{list-style:none}
 <header class="mobile-header">
   <div class="mobile-header-inner">
     <div class="mobile-header-logo">
+      <span class="mobile-header-logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
       <span>档案卡</span>
     </div>
     <div class="mobile-header-actions">
