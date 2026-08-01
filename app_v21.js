@@ -2660,22 +2660,25 @@ function handleSmartFileUpload(file,targetId){
         addSmartImage(dataUrl,file.name,'相册');
       });
     }
-    hintEl.textContent='正在识别图片文字...';hintEl.style.color='var(--warning)';
+    hintEl.textContent='首次加载OCR引擎约需10-30秒，请稍候...';hintEl.style.color='var(--warning)';
     loadTesseract().then(function(worker){
-      var reader=new FileReader();
-      reader.onload=function(e){
-        worker.recognize(e.target.result,'chi_sim+eng').then(function(result){
-          var text=result.data.text;
+      hintEl.textContent='OCR引擎就绪，正在识别图片文字...';hintEl.style.color='var(--warning)';
+      /* v5 API: 直接传File对象识别，不需要再传语言参数（创建worker时已设置） */
+      worker.recognize(file).then(function(result){
+        var text=(result&&result.data&&result.data.text)||'';
+        text=text.replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+        if(text){
           var ta=document.getElementById(textareaId);
           ta.value=(ta.value?ta.value+'\n':'')+text;
-          hintEl.textContent='图片识别完成'+(!isClient?'，图片已加入画廊':'')+'，请点击「识别数据」';hintEl.style.color='var(--success)';
-        }).catch(function(err){
-          hintEl.textContent='图片识别失败：'+err.message;hintEl.style.color='var(--danger)';
-        });
-      };
-      reader.readAsDataURL(file);
-    }).catch(function(){
-      hintEl.textContent='OCR引擎加载失败，请重试或直接粘贴';hintEl.style.color='var(--danger)';
+          hintEl.textContent='✅ 图片识别完成'+(!isClient?'，图片已加入画廊':'')+'（共'+text.length+'字），请点击「识别数据」';hintEl.style.color='var(--success)';
+        }else{
+          hintEl.textContent='⚠️ 图片识别完成但未提取到文字'+(!isClient?'，图片已加入画廊':'')+'，可手动输入或重新拍照';hintEl.style.color='var(--warning)';
+        }
+      }).catch(function(err){
+        hintEl.textContent='图片识别失败：'+(err.message||err)+'。可手动输入或重试';hintEl.style.color='var(--danger)';
+      });
+    }).catch(function(err){
+      hintEl.textContent='OCR引擎加载失败：'+(err.message||err)+'，请手动输入或重试';hintEl.style.color='var(--danger)';
     });
   }else{
     hintEl.textContent='不支持的文件格式，请上传Excel/CSV/TXT/PNG/JPG';hintEl.style.color='var(--danger)';
@@ -2693,20 +2696,56 @@ function loadSheetJS(){
   });
 }
 
+/* OCR worker 缓存：避免每次识别都重新加载语言模型 */
+var _ocrWorker=null;
+var _ocrLoading=null;
+
 function loadTesseract(){
-  return new Promise(function(resolve,reject){
-    if(window.TesseractWorker){resolve(new TesseractWorker());return}
-    var script=document.createElement('script');
-    script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    script.onload=function(){
-      try{
-        var worker=new TesseractWorker();
-        resolve(worker);
-      }catch(err){reject(err)}
-    };
-    script.onerror=function(){reject(new Error('load failed'))};
-    document.head.appendChild(script);
+  /* 已经创建过 worker，直接复用 */
+  if(_ocrWorker)return Promise.resolve(_ocrWorker);
+  /* 正在加载中，复用同一个 Promise */
+  if(_ocrLoading)return _ocrLoading;
+
+  _ocrLoading=new Promise(function(resolve,reject){
+    /* 已经载入 Tesseract v5 全局，直接创建 worker */
+    if(window.Tesseract&&window.Tesseract.createWorker){
+      window.Tesseract.createWorker('chi_sim+eng',1,{
+        logger:function(m){
+          if(m&&m.status){
+            /* 可以在这里更新进度提示 */
+            console.log('[OCR]',m.status,m.progress);
+          }
+        }
+      }).then(function(w){_ocrWorker=w;resolve(w)}).catch(function(e){_ocrLoading=null;reject(e)});
+      return;
+    }
+    /* 加载脚本：jsdelivr 优先，失败回退 unpkg */
+    var cdns=[
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js',
+      'https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js'
+    ];
+    var idx=0;
+    function tryLoad(){
+      if(idx>=cdns.length){_ocrLoading=null;reject(new Error('所有CDN都加载失败，请检查网络'));return}
+      var script=document.createElement('script');
+      script.src=cdns[idx++];
+      script.onload=function(){
+        if(window.Tesseract&&window.Tesseract.createWorker){
+          /* 创建 worker（首次加载语言模型约需10-30秒） */
+          window.Tesseract.createWorker('chi_sim+eng',1,{
+            logger:function(m){/* console.log('[OCR]',m) */}
+          }).then(function(w){_ocrWorker=w;resolve(w)}).catch(function(e){_ocrLoading=null;reject(e)});
+        }else{
+          _ocrLoading=null;
+          reject(new Error('Tesseract加载完成但createWorker不可用'));
+        }
+      };
+      script.onerror=function(){tryLoad()};
+      document.head.appendChild(script);
+    }
+    tryLoad();
   });
+  return _ocrLoading;
 }
 
 /* ========== Smart Image Extraction (粘贴图片/截图/公众号图片) ========== */

@@ -15,6 +15,19 @@ window.addEventListener('unhandledrejection',function(e){
 
 /* ========== Config ========== */
 var AREAS=['临平','余杭','萧山','拱墅','西湖','上城','滨江','钱塘','富阳','临安'];
+/* 杭州各城区板块/商圈数据（参考贝壳/我爱我家/政府官方命名） */
+var AREA_BLOCKS={
+  '临平':['临平新城','临平老城','临平东湖','临平运河','临平塘栖','临平星桥','临平崇贤','临平乔司','临平超山','临平南站'],
+  '余杭':['未来科技城','老余杭','闲林','仓前','瓶窑','径山','良渚','勾庄','仁和','瓶窑'],
+  '萧山':['市北','萧山开发区','钱江世纪城','湘湖','萧山老城','南部卧城','新塘','衙前','瓜沥','临浦','义桥','戴村','进化','河上'],
+  '拱墅':['运河新城','拱墅老城','申花','祥符','和睦','大关','湖墅','半山','康桥','上塘','三塘','华丰'],
+  '西湖':['文教','黄龙','蒋村','三墩','转塘','留下','之江','西溪','古荡','翠苑','文新','申花西路'],
+  '上城':['钱江新城','城站','近江','南星桥','望江','采荷','凯旋','笕桥','丁桥','九堡','彭埠','火车东站'],
+  '滨江':['滨江区政府','浦沿','西兴','长河','滨和路','滨康路','网易区块','阿里区块'],
+  '钱塘':['下沙','大学城北','沿江南','大江东','河庄','义蓬','新湾','临江','前进'],
+  '富阳':['富阳城区','银湖','东洲','鹿山','春江','大源','龙门','新登','场口'],
+  '临安':['临安主城区','青山湖','锦城','锦北','锦南','玲珑','板桥','太湖源','於潜','昌化']
+};
 var SK_C='xwg_fkb_clients_v6', SK_P='xwg_fkb_props_v6', SK_T='xwg_fkb_tx_v6', SK_AUTH='xwg_fkb_auth_v6', SK_USER='xwg_fkb_user_v6';
 
 /* ========== State ========== */
@@ -276,7 +289,8 @@ var MediaDB=(function(){
     if(!db){resolve();return}
     var tx=db.transaction(['media'],'readwrite');tx.objectStore('media').put(m);
     tx.oncomplete=function(){
-      if(SYNC_ENABLED&&S.currentUser){
+      /* raw 文件已经通过 upload-raw 上传到服务器，不需要再同步 base64 */
+      if(SYNC_ENABLED&&S.currentUser&&!m.isRawFile){
         fetch(API_BASE+'/api/media',{
           method:'POST',
           headers:getAuthHeader(),
@@ -431,12 +445,47 @@ function switchSubtab(sub){
   if(addBtn){
     if(sub==='newdev'){
       addBtn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增楼盘';
+    }else if(sub==='rental'){
+      addBtn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增出租房';
+    }else if(sub==='community'){
+      addBtn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增小区';
     }else{
       addBtn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>新增房源';
     }
   }
-  renderPropertyList();
+  /* 根据subtab显示/隐藏筛选项 */
+  updateFilterVisibility(sub);
+  /* 更新板块下拉选项 */
+  updateBlockOptions(sub);
+  /* 小区tab隐藏视图切换和筛选栏 */
+  var propViewToggle=document.getElementById('propViewToggle');
+  if(propViewToggle)propViewToggle.style.display=(sub==='community')?'none':'';
+  var propFilterToggle=document.getElementById('propFilterToggle');
+  if(propFilterToggle)propFilterToggle.style.display=(sub==='community')?'none':'';
+  if(sub==='community'){
+    renderCommunityList();
+  }else{
+    renderPropertyList();
+  }
   }catch(err){console.error('[switchSubtab]',err);toast('切换失败: '+err.message,'error')}
+}
+/* 根据subtab显示/隐藏筛选项 */
+function updateFilterVisibility(sub){
+  document.querySelectorAll('[data-filter-show]').forEach(function(el){
+    var show=el.getAttribute('data-filter-show')||'';
+    var types=show.split(',').map(function(s){return s.trim()});
+    el.style.display=types.indexOf(sub)>=0?'':'none';
+  });
+}
+/* 更新板块下拉选项 */
+function updateBlockOptions(sub){
+  var areaSelect=document.getElementById('pfFilterArea');
+  var blockSelect=document.getElementById('pfFilterBlock');
+  if(!blockSelect)return;
+  var area=areaSelect?areaSelect.value:'';
+  var blocks=area&&AREA_BLOCKS[area]?AREA_BLOCKS[area]:[];
+  var cur=S.propFilters.block||'';
+  blockSelect.innerHTML='<option value="">全部</option>'+blocks.map(function(b){return'<option value="'+esc(b)+'"'+(b===cur?' selected':'')+'>'+esc(b)+'</option>'}).join('');
 }
 
 /* ========== Client: Stats ========== */
@@ -2611,22 +2660,25 @@ function handleSmartFileUpload(file,targetId){
         addSmartImage(dataUrl,file.name,'相册');
       });
     }
-    hintEl.textContent='正在识别图片文字...';hintEl.style.color='var(--warning)';
+    hintEl.textContent='首次加载OCR引擎约需10-30秒，请稍候...';hintEl.style.color='var(--warning)';
     loadTesseract().then(function(worker){
-      var reader=new FileReader();
-      reader.onload=function(e){
-        worker.recognize(e.target.result,'chi_sim+eng').then(function(result){
-          var text=result.data.text;
+      hintEl.textContent='OCR引擎就绪，正在识别图片文字...';hintEl.style.color='var(--warning)';
+      /* v5 API: 直接传File对象识别，不需要再传语言参数（创建worker时已设置） */
+      worker.recognize(file).then(function(result){
+        var text=(result&&result.data&&result.data.text)||'';
+        text=text.replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+        if(text){
           var ta=document.getElementById(textareaId);
           ta.value=(ta.value?ta.value+'\n':'')+text;
-          hintEl.textContent='图片识别完成'+(!isClient?'，图片已加入画廊':'')+'，请点击「识别数据」';hintEl.style.color='var(--success)';
-        }).catch(function(err){
-          hintEl.textContent='图片识别失败：'+err.message;hintEl.style.color='var(--danger)';
-        });
-      };
-      reader.readAsDataURL(file);
-    }).catch(function(){
-      hintEl.textContent='OCR引擎加载失败，请重试或直接粘贴';hintEl.style.color='var(--danger)';
+          hintEl.textContent='✅ 图片识别完成'+(!isClient?'，图片已加入画廊':'')+'（共'+text.length+'字），请点击「识别数据」';hintEl.style.color='var(--success)';
+        }else{
+          hintEl.textContent='⚠️ 图片识别完成但未提取到文字'+(!isClient?'，图片已加入画廊':'')+'，可手动输入或重新拍照';hintEl.style.color='var(--warning)';
+        }
+      }).catch(function(err){
+        hintEl.textContent='图片识别失败：'+(err.message||err)+'。可手动输入或重试';hintEl.style.color='var(--danger)';
+      });
+    }).catch(function(err){
+      hintEl.textContent='OCR引擎加载失败：'+(err.message||err)+'，请手动输入或重试';hintEl.style.color='var(--danger)';
     });
   }else{
     hintEl.textContent='不支持的文件格式，请上传Excel/CSV/TXT/PNG/JPG';hintEl.style.color='var(--danger)';
@@ -2644,20 +2696,56 @@ function loadSheetJS(){
   });
 }
 
+/* OCR worker 缓存：避免每次识别都重新加载语言模型 */
+var _ocrWorker=null;
+var _ocrLoading=null;
+
 function loadTesseract(){
-  return new Promise(function(resolve,reject){
-    if(window.TesseractWorker){resolve(new TesseractWorker());return}
-    var script=document.createElement('script');
-    script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    script.onload=function(){
-      try{
-        var worker=new TesseractWorker();
-        resolve(worker);
-      }catch(err){reject(err)}
-    };
-    script.onerror=function(){reject(new Error('load failed'))};
-    document.head.appendChild(script);
+  /* 已经创建过 worker，直接复用 */
+  if(_ocrWorker)return Promise.resolve(_ocrWorker);
+  /* 正在加载中，复用同一个 Promise */
+  if(_ocrLoading)return _ocrLoading;
+
+  _ocrLoading=new Promise(function(resolve,reject){
+    /* 已经载入 Tesseract v5 全局，直接创建 worker */
+    if(window.Tesseract&&window.Tesseract.createWorker){
+      window.Tesseract.createWorker('chi_sim+eng',1,{
+        logger:function(m){
+          if(m&&m.status){
+            /* 可以在这里更新进度提示 */
+            console.log('[OCR]',m.status,m.progress);
+          }
+        }
+      }).then(function(w){_ocrWorker=w;resolve(w)}).catch(function(e){_ocrLoading=null;reject(e)});
+      return;
+    }
+    /* 加载脚本：jsdelivr 优先，失败回退 unpkg */
+    var cdns=[
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js',
+      'https://unpkg.com/tesseract.js@5.0.4/dist/tesseract.min.js'
+    ];
+    var idx=0;
+    function tryLoad(){
+      if(idx>=cdns.length){_ocrLoading=null;reject(new Error('所有CDN都加载失败，请检查网络'));return}
+      var script=document.createElement('script');
+      script.src=cdns[idx++];
+      script.onload=function(){
+        if(window.Tesseract&&window.Tesseract.createWorker){
+          /* 创建 worker（首次加载语言模型约需10-30秒） */
+          window.Tesseract.createWorker('chi_sim+eng',1,{
+            logger:function(m){/* console.log('[OCR]',m) */}
+          }).then(function(w){_ocrWorker=w;resolve(w)}).catch(function(e){_ocrLoading=null;reject(e)});
+        }else{
+          _ocrLoading=null;
+          reject(new Error('Tesseract加载完成但createWorker不可用'));
+        }
+      };
+      script.onerror=function(){tryLoad()};
+      document.head.appendChild(script);
+    }
+    tryLoad();
   });
+  return _ocrLoading;
 }
 
 /* ========== Smart Image Extraction (粘贴图片/截图/公众号图片) ========== */
@@ -2851,9 +2939,15 @@ function di(label,value){return'<div class="detail-item"><div class="label">'+es
 function getFilteredProperties(){
   var list=S.properties.slice();
   var f=S.propFilters;var q=S.search.trim().toLowerCase();
-  // 先按顶部 tab 过滤（除非用户手动选择了"类型"筛选）
+  // community 类型不在房源列表显示
+  list=list.filter(function(p){return p.type!=='community'});
+  // 先按顶部 tab 过滤
   if(!f.type){
-    list=list.filter(function(p){return p.type===S.subtab});
+    if(S.subtab==='community'){
+      list=list.filter(function(p){return p.type==='secondhand'||p.type==='rental'});
+    }else{
+      list=list.filter(function(p){return p.type===S.subtab});
+    }
   }
   // 录入人筛选（仅admin）
   if(isAdmin()&&S.filterCreatedBy){
@@ -2863,11 +2957,14 @@ function getFilteredProperties(){
       list=list.filter(function(p){return p.createdBy===S.filterCreatedBy});
     }
   }
-  if(q){list=list.filter(function(p){var h=[p.title,p.community,p.developer,p.description,p.address,p.ownerName,p.ownerPhone,(p.tags||[]).join(' ')].join(' ').toLowerCase();return h.indexOf(q)>=0})}
+  if(q){list=list.filter(function(p){var h=[p.title,p.community,p.developer,p.description,p.address,p.ownerName,p.ownerPhone,p.building,p.unit,p.room,(p.tags||[]).join(' ')].join(' ').toLowerCase();return h.indexOf(q)>=0})}
   if(f.area)list=list.filter(function(p){return p.district===f.area});
+  if(f.block)list=list.filter(function(p){return p.block===f.block});
   if(f.community){var cf=f.community.toLowerCase();list=list.filter(function(p){return(p.community||'').toLowerCase().indexOf(cf)>=0||(p.developer||'').toLowerCase().indexOf(cf)>=0||(p.title||'').toLowerCase().indexOf(cf)>=0})}
+  if(f.building){var bf=f.building.toLowerCase();list=list.filter(function(p){return(p.building||'').toLowerCase().indexOf(bf)>=0})}
+  if(f.unit){var uf=f.unit.toLowerCase();list=list.filter(function(p){return(p.unit||'').toLowerCase().indexOf(uf)>=0})}
+  if(f.room){var rf=f.room.toLowerCase();list=list.filter(function(p){return(p.room||'').toLowerCase().indexOf(rf)>=0})}
   if(f.areaSeg){var seg=f.areaSeg.split('-');var lo=parseFloat(seg[0]);var hi=parseFloat(seg[1]);list=list.filter(function(p){
-    /* 新楼盘从 availableLayouts（如"89-120㎡"）提取最大面积 */
     var a=parseFloat(p.area)||0;
     if(!a&&p.availableLayouts){
       var nums=(p.availableLayouts.match(/\d+/g)||[]).map(function(n){return parseFloat(n)});
@@ -2877,7 +2974,7 @@ function getFilteredProperties(){
     return a>=lo&&a<hi;
   })}
   if(f.totalPrice){var seg0=f.totalPrice.split('-');var lo0=parseFloat(seg0[0]);var hi0=parseFloat(seg0[1]);list=list.filter(function(p){
-    var pr=parseFloat(p.totalPrice)||0;
+    var pr=parseFloat(p.totalPrice)||parseFloat(p.rentPrice)||0;
     return pr>=lo0&&pr<hi0;
   })}
   if(f.unitPrice){var seg2=f.unitPrice.split('-');var lo2=parseFloat(seg2[0]);var hi2=parseFloat(seg2[1]);list=list.filter(function(p){
@@ -2925,17 +3022,36 @@ function renderPropertyList(){
     return;
   }
   grid.innerHTML=list.map(function(p){
-    var price=p.type==='secondhand'?(p.totalPrice?p.totalPrice+'<span class="unit">万</span>':'面议'):(p.averagePrice?p.averagePrice+'<span class="unit">元/㎡</span>':'面议');
-    var info=p.type==='secondhand'?[p.area?p.area+'㎡':'',p.layout||'',p.orientation||''].filter(Boolean):[p.developer||'',p.availableLayouts||''].filter(Boolean);
+    var price;
+    if(p.type==='rental'){
+      price=p.rentPrice?p.rentPrice+'<span class="unit">元/月</span>':'面议';
+    }else if(p.type==='secondhand'){
+      price=p.totalPrice?p.totalPrice+'<span class="unit">万</span>':'面议';
+    }else{
+      price=p.averagePrice?p.averagePrice+'<span class="unit">元/㎡</span>':'面议';
+    }
+    var typeLabel=p.type==='secondhand'?'二手房':(p.type==='rental'?'租赁':'新楼盘');
+    var info;
+    if(p.type==='rental'){
+      info=[p.area?p.area+'㎡':'',p.layout||'',p.depositType||'',p.rentType||''].filter(Boolean);
+    }else if(p.type==='secondhand'){
+      info=[p.area?p.area+'㎡':'',p.layout||'',p.orientation||''].filter(Boolean);
+      // 添加楼幢单元房间号
+      var locStr=[p.building,p.unit,p.room].filter(Boolean).join(' ');
+      if(locStr)info.unshift(locStr);
+    }else{
+      info=[p.developer||'',p.availableLayouts||''].filter(Boolean);
+    }
     var tags=(p.tags||[]).map(function(t){return'<span class="client-tag">'+esc(t)+'</span>'}).join('');
     var propPinned=(S.pinnedPropIds||[]).indexOf(p.id)>=0;
+    var titleDisplay=p.type==='secondhand'||p.type==='rental' ? (p.community||'')+(p.building?(' '+p.building):'')+(p.unit?(' '+p.unit):'')+(p.room?(' '+p.room):'') : (p.title||'');
     return'<div class="property-card'+(propPinned?' pinned':'')+'" data-status="'+esc(p.status)+'" data-id="'+p.id+'">'
       +(propPinned?'<div style="position:absolute;top:8px;right:8px;z-index:2;font-size:1rem">⭐</div>':'')
-      +'<div class="card-thumb no-img" data-thumb="'+p.id+'"><span class="type-label">'+(p.type==='secondhand'?'二手房':'新楼盘')+'</span><span class="media-count" data-media-count="'+p.id+'" style="display:none"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="mc-num">0</span></span></div>'
-      +'<div class="card-body"><div class="card-title">'+esc(p.title)+'</div><div class="card-price">'+price+'</div>'
+      +'<div class="card-thumb no-img" data-thumb="'+p.id+'"><span class="type-label">'+typeLabel+'</span><span class="media-count" data-media-count="'+p.id+'" style="display:none"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="mc-num">0</span></span></div>'
+      +'<div class="card-body"><div class="card-title">'+esc(titleDisplay||'未命名')+'</div><div class="card-price">'+price+'</div>'
       +'<div class="card-info">'+info.map(function(i){return'<span>'+esc(i)+'</span>'}).join('')+'</div>'
       +(tags?'<div class="prop-tags">'+tags+'</div>':'')
-      +'<div class="card-info"><span>'+esc(p.district||'')+'</span><span class="status-badge" data-status="'+esc(p.status)+'">'+esc(p.status)+'</span></div>'
+      +'<div class="card-info"><span>'+esc(p.district||'')+(p.block?('·'+esc(p.block)):'')+'</span><span class="status-badge" data-status="'+esc(p.status)+'">'+esc(p.status)+'</span></div>'
       +'<div class="card-actions"><button data-action="pview" data-id="'+p.id+'">详情</button><button data-action="pshare" data-id="'+p.id+'">分享</button><button data-action="ppin" data-id="'+p.id+'" title="'+(propPinned?'取消重点':'标为重点')+'">'+(propPinned?'⭐取消':'⭐重点')+'</button><button data-action="pedit" data-id="'+p.id+'">编辑</button></div>'
       +'</div></div>';
   }).join('');
@@ -2976,6 +3092,384 @@ function renderPropertyList(){
   }catch(err){console.error('[renderPropertyList]',err)}
 }
 
+/* ========== Community (二手小区) ========== */
+function renderCommunityList(){
+  try{
+  /* 获取所有小区名称（从二手房+租赁房中提取，加上已有的community类型记录） */
+  var communityMap={};
+  /* 先从 community 类型记录中获取已有概况 */
+  S.properties.filter(function(p){return p.type==='community'}).forEach(function(c){
+    var name=c.title||c.community||'';
+    if(name)communityMap[name]={info:c,forSale:0,forRent:0};
+  });
+  /* 从二手房+租赁房中统计 */
+  S.properties.filter(function(p){return p.type==='secondhand'||p.type==='rental'}).forEach(function(p){
+    var name=p.community||'';
+    if(!name)return;
+    if(!communityMap[name])communityMap[name]={info:null,forSale:0,forRent:0};
+    if(p.type==='secondhand')communityMap[name].forSale++;
+    if(p.type==='rental')communityMap[name].forRent++;
+    /* 如果没有概况记录，从房源中提取区域信息 */
+    if(!communityMap[name].info){
+      communityMap[name].district=p.district||'';
+      communityMap[name].block=p.block||'';
+    }
+  });
+  var names=Object.keys(communityMap).sort();
+  var grid=document.getElementById('propertyGrid');
+  var table=document.getElementById('propertyTable');
+  if(grid)grid.style.display='';
+  if(table)table.style.display='none';
+  document.getElementById('propResultCount').innerHTML='共 <b>'+names.length+'</b> 个小区';
+  if(names.length===0){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><h3>还没有小区档案</h3><p>在二手房或租赁房中录入房源后，小区会自动出现在这里。也可点击「新增小区」手动添加小区概况。</p></div>';
+    return;
+  }
+  grid.innerHTML=names.map(function(name){
+    var c=communityMap[name];
+    var info=c.info||{};
+    var district=c.info?(c.info.district||''):(c.district||'');
+    var block=c.info?(c.info.block||''):(c.block||'');
+    var locStr=district+(block?('·'+block):'');
+    /* 概况信息 */
+    var overviewItems=[];
+    if(info.buildingCount)overviewItems.push('楼幢：'+esc(info.buildingCount));
+    if(info.householdCount)overviewItems.push('户数：'+esc(info.householdCount));
+    if(info.buildingAge)overviewItems.push('房龄：'+esc(info.buildingAge));
+    if(info.street)overviewItems.push('街道：'+esc(info.street));
+    if(info.neighborhood)overviewItems.push('社区：'+esc(info.neighborhood));
+    if(info.propertyManagement)overviewItems.push('物业：'+esc(info.propertyManagement));
+    /* 学区 */
+    var schoolStr='';
+    if(info.kindergarten||info.primarySchool||info.middleSchool){
+      var schools=[];
+      if(info.kindergarten)schools.push('幼儿园：'+esc(info.kindergarten));
+      if(info.primarySchool)schools.push('小学：'+esc(info.primarySchool));
+      if(info.middleSchool)schools.push('中学：'+esc(info.middleSchool));
+      schoolStr=schools.join(' / ');
+    }
+    /* 物业费 */
+    var feeStr='';
+    if(info.propertyFees&&info.propertyFees.length>0){
+      feeStr=info.propertyFees.map(function(f){return esc(f.type||'')+':'+esc(f.fee||'')}).join('，');
+    }
+    var hasOverview=!!c.info;
+    return'<div class="community-card" data-community="'+esc(name)+'">'
+      +'<div class="card-body" style="padding:16px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+      +'<div><div class="card-title" style="font-size:1rem;font-weight:600">'+esc(name)+'</div>'
+      +'<div class="card-info"><span>'+esc(locStr||'未分类区域')+'</span></div></div>'
+      +'<div style="display:flex;gap:6px">'
+      +'<span class="status-badge" data-status="在售" style="cursor:pointer" data-cview="secondhand" data-cname="'+esc(name)+'">在售 '+c.forSale+'</span>'
+      +'<span class="status-badge" data-status="已租" style="cursor:pointer" data-cview="rental" data-cname="'+esc(name)+'">在租 '+c.forRent+'</span>'
+      +'</div></div>'
+      +(overviewItems.length?'<div class="card-info" style="margin-bottom:4px">'+overviewItems.map(function(s){return'<span>'+s+'</span>'}).join('')+'</div>':'')
+      +(schoolStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">🏫 '+schoolStr+'</div>':'')
+      +(feeStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">💰 物业费：'+feeStr+'</div>':'')
+      +(!hasOverview?'<div style="font-size:.75rem;color:var(--warning);margin-bottom:4px">⚠ 未填写小区概况</div>':'')
+      +'<div class="card-actions">'
+      +'<button data-action="cedit" data-cname="'+esc(name)+'">'+(hasOverview?'编辑概况':'添加概况')+'</button>'
+      +'<button data-action="csale" data-cname="'+esc(name)+'">看在售</button>'
+      +'<button data-action="crent" data-cname="'+esc(name)+'">看在租</button>'
+      +'</div></div></div>';
+  }).join('');
+  /* 绑定事件 */
+  grid.querySelectorAll('.community-card .card-actions button').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var a=btn.getAttribute('data-action');
+      var name=btn.getAttribute('data-cname');
+      if(a==='cedit')openCommunityForm(name);
+      if(a==='csale'){S.propFilters.community=name;switchSubtab('secondhand');var el=document.getElementById('pfFilterCommunity');if(el)el.value=name;}
+      if(a==='crent'){S.propFilters.community=name;switchSubtab('rental');var el2=document.getElementById('pfFilterCommunity');if(el2)el2.value=name;}
+    });
+  });
+  grid.querySelectorAll('[data-cview]').forEach(function(el){
+    el.addEventListener('click',function(e){
+      e.stopPropagation();
+      var name=el.getAttribute('data-cname');
+      var view=el.getAttribute('data-cview');
+      S.propFilters.community=name;
+      switchSubtab(view);
+      var inp=document.getElementById('pfFilterCommunity');
+      if(inp)inp.value=name;
+    });
+  });
+  }catch(err){console.error('[renderCommunityList]',err);toast('小区列表加载失败: '+err.message,'error')}
+}
+
+/* 打开小区概况编辑表单 */
+function openCommunityForm(name){
+  var existing=S.properties.find(function(p){return p.type==='community'&&(p.title===name||p.community===name)});
+  var c=existing||{type:'community',title:name,community:name};
+  var html='<div class="modal-overlay show" id="communityFormModal">'
+    +'<div class="modal" style="max-width:560px">'
+    +'<div class="modal-header"><h3>'+(existing?'编辑小区概况':'添加小区概况')+'</h3><button class="modal-close" onclick="document.getElementById(\'communityFormModal\').remove()">×</button></div>'
+    +'<div class="modal-body" style="max-height:70vh;overflow-y:auto;padding:16px">'
+    +'<input type="hidden" id="cmId" value="'+esc(c.id||'')+'">'
+    +'<input type="hidden" id="cmOrigName" value="'+esc(name||'')+'">'
+    +'<div class="form-grid">'
+    +'<div class="form-field"><label>小区名称 <span class="req">*</span></label><input type="text" id="cmName" value="'+esc(c.title||c.community||name||'')+'" placeholder="如：理想家园"></div>'
+    +'<div class="form-field"><label>区域</label><select id="cmDistrict"><option value="">请选择</option>'
+    +['临平','余杭','萧山','拱墅','西湖','上城','滨江','钱塘','富阳','临安'].map(function(d){return'<option value="'+d+'"'+(c.district===d?' selected':'')+'>'+d+'</option>'}).join('')
+    +'</select></div>'
+    +'<div class="form-field"><label>板块/商圈</label><input type="text" id="cmBlock" value="'+esc(c.block||'')+'" placeholder="如：临平新城"></div>'
+    +'<div class="form-field"><label>共计楼幢</label><input type="text" id="cmBuildingCount" value="'+esc(c.buildingCount||'')+'" placeholder="如：12幢"></div>'
+    +'<div class="form-field"><label>共计户数</label><input type="text" id="cmHouseholdCount" value="'+esc(c.householdCount||'')+'" placeholder="如：1200户"></div>'
+    +'<div class="form-field"><label>房龄</label><input type="text" id="cmBuildingAge" value="'+esc(c.buildingAge||'')+'" placeholder="如：2018年"></div>'
+    +'<div class="form-field"><label>归属街道</label><input type="text" id="cmStreet" value="'+esc(c.street||'')+'" placeholder="如：南苑街道"></div>'
+    +'<div class="form-field"><label>归属社区</label><input type="text" id="cmNeighborhood" value="'+esc(c.neighborhood||'')+'" placeholder="如：时代社区"></div>'
+    +'<div class="form-field"><label>对口幼儿园</label><input type="text" id="cmKindergarten" value="'+esc(c.kindergarten||'')+'" placeholder="如：临平第一幼儿园"></div>'
+    +'<div class="form-field"><label>对口小学</label><input type="text" id="cmPrimarySchool" value="'+esc(c.primarySchool||'')+'" placeholder="如：临平第一小学"></div>'
+    +'<div class="form-field"><label>对口中学</label><input type="text" id="cmMiddleSchool" value="'+esc(c.middleSchool||'')+'" placeholder="如：临平第五中学"></div>'
+    +'<div class="form-field"><label>物业名称</label><input type="text" id="cmPropertyManagement" value="'+esc(c.propertyManagement||'')+'" placeholder="如：绿城物业"></div>'
+    +'</div>'
+    /* 物业费标准（多种业态） */
+    +'<div style="margin-top:12px"><label style="font-size:.8125rem;font-weight:600;display:block;margin-bottom:6px">物业费标准（可添加多种业态）</label>'
+    +'<div id="cmFeeList" style="margin-bottom:8px"></div>'
+    +'<button type="button" class="btn-mini" id="cmAddFee" style="border:1px solid var(--border);background:var(--bg-secondary);padding:4px 10px;font-size:.75rem;border-radius:6px;cursor:pointer">+ 添加物业费</button>'
+    +'</div>'
+    +'<div class="form-field" style="margin-top:12px"><label>备注</label><textarea id="cmNotes" rows="2" placeholder="其他需要记录的信息">'+esc(c.notes||'')+'</textarea></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn-secondary" onclick="document.getElementById(\'communityFormModal\').remove()">取消</button>'
+    +'<button class="btn-primary" id="cmSaveBtn">保存</button>'
+    +'</div></div></div>';
+  /* 移除已有的模态框 */
+  var old=document.getElementById('communityFormModal');
+  if(old)old.remove();
+  document.body.insertAdjacentHTML('beforeend',html);
+  /* 物业费列表 */
+  var fees=(c.propertyFees||[]);
+  function renderFeeList(){
+    var container=document.getElementById('cmFeeList');
+    container.innerHTML=fees.map(function(f,i){
+      return'<div style="display:flex;gap:6px;margin-bottom:4px;align-items:center">'
+        +'<input type="text" class="cm-fee-type" value="'+esc(f.type||'')+'" placeholder="业态（如高层）" style="flex:1;font-size:.75rem;padding:4px 8px;border:1px solid var(--border);border-radius:4px">'
+        +'<input type="text" class="cm-fee-amount" value="'+esc(f.fee||'')+'" placeholder="费用（如3.5元/㎡/月）" style="flex:1.5;font-size:.75rem;padding:4px 8px;border:1px solid var(--border);border-radius:4px">'
+        +'<button type="button" class="cm-fee-del" data-idx="'+i+'" style="color:#dc2626;border:none;background:none;cursor:pointer;font-size:1rem">×</button>'
+        +'</div>';
+    }).join('');
+    container.querySelectorAll('.cm-fee-del').forEach(function(btn){
+      btn.addEventListener('click',function(){fees.splice(parseInt(btn.getAttribute('data-idx')),1);renderFeeList()});
+    });
+    container.querySelectorAll('.cm-fee-type').forEach(function(inp,i){inp.addEventListener('input',function(){fees[i]=fees[i]||{};fees[i].type=this.value})});
+    container.querySelectorAll('.cm-fee-amount').forEach(function(inp,i){inp.addEventListener('input',function(){fees[i]=fees[i]||{};fees[i].fee=this.value})});
+  }
+  renderFeeList();
+  document.getElementById('cmAddFee').addEventListener('click',function(){fees.push({type:'',fee:''});renderFeeList()});
+  /* 保存按钮 */
+  document.getElementById('cmSaveBtn').addEventListener('click',function(){
+    var newName=document.getElementById('cmName').value.trim();
+    if(!newName){toast('请输入小区名称','error');return}
+    var id=document.getElementById('cmId').value;
+    var origName=document.getElementById('cmOrigName').value;
+    var p=id?findProp(id):{};
+    p.type='community';
+    p.title=newName;
+    p.community=newName;
+    p.district=document.getElementById('cmDistrict').value;
+    p.block=document.getElementById('cmBlock').value.trim();
+    p.buildingCount=document.getElementById('cmBuildingCount').value.trim();
+    p.householdCount=document.getElementById('cmHouseholdCount').value.trim();
+    p.buildingAge=document.getElementById('cmBuildingAge').value.trim();
+    p.street=document.getElementById('cmStreet').value.trim();
+    p.neighborhood=document.getElementById('cmNeighborhood').value.trim();
+    p.kindergarten=document.getElementById('cmKindergarten').value.trim();
+    p.primarySchool=document.getElementById('cmPrimarySchool').value.trim();
+    p.middleSchool=document.getElementById('cmMiddleSchool').value.trim();
+    p.propertyManagement=document.getElementById('cmPropertyManagement').value.trim();
+    p.propertyFees=fees.filter(function(f){return f.type||f.fee});
+    p.notes=document.getElementById('cmNotes').value.trim();
+    if(!id){
+      p.id=uuid();p.createdAt=now();
+      S.properties.push(p);
+    }else{
+      p.updatedAt=now();
+    }
+    /* 如果改了名字，更新关联房源的community字段 */
+    if(origName&&origName!==newName){
+      S.properties.forEach(function(prop){
+        if(prop.type!=='community'&&prop.community===origName){
+          prop.community=newName;
+          /* 重新生成标题 */
+          if(prop.type==='secondhand'||prop.type==='rental'){
+            var locStr=[prop.building,prop.unit,prop.room].filter(Boolean).join(' ');
+            prop.title=newName+(locStr?(' '+locStr):'');
+          }
+        }
+      });
+    }
+    saveP();
+    document.getElementById('communityFormModal').remove();
+    renderCommunityList();
+    toast('小区概况已保存','success');
+  });
+}
+
+/* 小区智能识别录入 */
+function openCommunitySmartInput(){
+  var html='<div class="modal-overlay show" id="cmSmartModal">'
+    +'<div class="modal" style="max-width:600px">'
+    +'<div class="modal-header"><h3>小区概况智能录入</h3><button class="modal-close" onclick="document.getElementById(\'cmSmartModal\').remove()">×</button></div>'
+    +'<div class="modal-body" style="max-height:70vh;overflow-y:auto;padding:16px">'
+    +'<div class="sig-hint" style="background:var(--primary-light);border-radius:8px;padding:10px;margin-bottom:12px;font-size:.8125rem;color:var(--text-secondary)">'
+    +'粘贴小区概况信息，支持以下格式：<br>'
+    +'1. 表格粘贴（Excel直接粘贴）<br>'
+    +'2. 键值对（小区名：XX 楼幢：12幢 房龄：2018年 ...）<br>'
+    +'3. 自由文本（系统尝试自动识别关键字段）</div>'
+    +'<textarea id="cmSmartArea" rows="10" style="width:100%;font-size:.8125rem;padding:8px;border:1px solid var(--border);border-radius:6px" placeholder="粘贴小区概况信息…"></textarea>'
+    +'<div id="cmSmartPreview" style="margin-top:12px"></div>'
+    +'</div>'
+    +'<div class="modal-footer">'
+    +'<button class="btn-secondary" onclick="document.getElementById(\'cmSmartModal\').remove()">取消</button>'
+    +'<button class="btn-primary" id="cmSmartParseBtn">识别</button>'
+    +'<button class="btn-primary" id="cmSmartImportBtn" style="display:none">全部录入</button>'
+    +'</div></div></div>';
+  var old=document.getElementById('cmSmartModal');
+  if(old)old.remove();
+  document.body.insertAdjacentHTML('beforeend',html);
+  var parsedCommunities=[];
+  document.getElementById('cmSmartParseBtn').addEventListener('click',function(){
+    var text=document.getElementById('cmSmartArea').value.trim();
+    if(!text){toast('请先粘贴数据','error');return}
+    parsedCommunities=parseCommunitySmartInput(text);
+    if(parsedCommunities.length===0){
+      document.getElementById('cmSmartPreview').innerHTML='<p style="color:var(--warning)">未识别到有效小区数据，请检查格式</p>';
+      return;
+    }
+    document.getElementById('cmSmartPreview').innerHTML='<p style="color:var(--success)">已识别 '+parsedCommunities.length+' 个小区，请检查后点击「全部录入」</p>'
+      +parsedCommunities.map(function(c,i){
+        return'<div style="background:var(--bg-secondary);border-radius:6px;padding:8px;margin-bottom:6px;font-size:.75rem">'
+          +'<b>'+(c.title||c.community||'未命名')+'</b>'
+          +(c.district?' | '+c.district:'')+(c.block?' · '+c.block:'')
+          +(c.buildingCount?' | 楼幢:'+c.buildingCount:'')
+          +(c.buildingAge?' | 房龄:'+c.buildingAge:'')
+          +(c.street?' | '+c.street:'')
+          +(c.propertyManagement?' | 物业:'+c.propertyManagement:'')
+          +'</div>';
+      }).join('');
+    document.getElementById('cmSmartImportBtn').style.display='';
+  });
+  document.getElementById('cmSmartImportBtn').addEventListener('click',function(){
+    parsedCommunities.forEach(function(c){
+      /* 按名字查找已有记录 */
+      var existing=S.properties.find(function(p){return p.type==='community'&&(p.title===c.title||p.community===c.title)});
+      if(existing){
+        Object.keys(c).forEach(function(k){if(c[k])existing[k]=c[k]});
+        existing.updatedAt=now();
+      }else{
+        c.id=uuid();c.type='community';c.createdAt=now();
+        if(!c.community)c.community=c.title;
+        S.properties.push(c);
+      }
+    });
+    saveP();
+    document.getElementById('cmSmartModal').remove();
+    renderCommunityList();
+    toast('已录入 '+parsedCommunities.length+' 个小区概况','success');
+  });
+}
+
+/* 解析小区智能录入 */
+function parseCommunitySmartInput(text){
+  var results=[];
+  /* 尝试检测表格格式（制表符或多个空格分隔） */
+  var lines=text.split('\n').filter(function(l){return l.trim()});
+  /* 检测是否有表头 */
+  var headerMap={'小区':null,'名称':null,'楼幢':null,'户数':null,'房龄':null,'街道':null,'社区':null,'幼儿园':null,'小学':null,'中学':null,'物业':null,'物业费':null,'区域':null,'板块':null,'商圈':null};
+  /* 尝试键值对解析 */
+  var current={};
+  var kvPattern=/([^\s:：]+)[：:]\s*([^\s\n]+)/g;
+  var hasKV=false;
+  lines.forEach(function(line){
+    var matches=line.match(kvPattern);
+    if(matches&&matches.length>0){
+      hasKV=true;
+      matches.forEach(function(m){
+        var parts=m.split(/[：:]/);
+        if(parts.length>=2){
+          var key=parts[0].trim();
+          var val=parts.slice(1).join(':').trim();
+          if(key.indexOf('小区')>=0||key.indexOf('名称')>=0){current.title=current.title||val;current.community=current.community||val}
+          else if(key.indexOf('区域')>=0||key.indexOf('区')>=0)current.district=val;
+          else if(key.indexOf('板块')>=0||key.indexOf('商圈')>=0)current.block=val;
+          else if(key.indexOf('楼幢')>=0||key.indexOf('栋数')>=0)current.buildingCount=val;
+          else if(key.indexOf('户数')>=0)current.householdCount=val;
+          else if(key.indexOf('房龄')>=0||key.indexOf('年代')>=0||key.indexOf('建成')>=0)current.buildingAge=val;
+          else if(key.indexOf('街道')>=0)current.street=val;
+          else if(key.indexOf('社区')>=0&&key.indexOf('小区')<0)current.neighborhood=val;
+          else if(key.indexOf('幼儿园')>=0)current.kindergarten=val;
+          else if(key.indexOf('小学')>=0)current.primarySchool=val;
+          else if(key.indexOf('中学')>=0||key.indexOf('初中')>=0)current.middleSchool=val;
+          else if(key.indexOf('物业')>=0&&key.indexOf('费')<0)current.propertyManagement=val;
+        }
+      });
+    }
+  });
+  if(hasKV&&current.title){
+    results.push(current);
+    return results;
+  }
+  /* 尝试表格解析（Tab或逗号分隔） */
+  if(lines.length>=2){
+    var sep=lines[0].indexOf('\t')>=0?'\t':',';
+    var headers=lines[0].split(sep).map(function(h){return h.trim()});
+    var hasHeader=headers.some(function(h){return h.indexOf('小区')>=0||h.indexOf('名称')>=0||h.indexOf('物业')>=0});
+    if(hasHeader){
+      for(var i=1;i<lines.length;i++){
+        var cols=lines[i].split(sep);
+        var obj={};
+        headers.forEach(function(h,idx){
+          var val=cols[idx]?cols[idx].trim():'';
+          if(!val)return;
+          if(h.indexOf('小区')>=0||h.indexOf('名称')>=0){obj.title=val;obj.community=val}
+          else if(h.indexOf('区域')>=0||h==='区')obj.district=val;
+          else if(h.indexOf('板块')>=0||h.indexOf('商圈')>=0)obj.block=val;
+          else if(h.indexOf('楼幢')>=0||h.indexOf('栋数')>=0)obj.buildingCount=val;
+          else if(h.indexOf('户数')>=0)obj.householdCount=val;
+          else if(h.indexOf('房龄')>=0||h.indexOf('年代')>=0||h.indexOf('建成')>=0)obj.buildingAge=val;
+          else if(h.indexOf('街道')>=0)obj.street=val;
+          else if(h.indexOf('社区')>=0&&h.indexOf('小区')<0)obj.neighborhood=val;
+          else if(h.indexOf('幼儿园')>=0)obj.kindergarten=val;
+          else if(h.indexOf('小学')>=0)obj.primarySchool=val;
+          else if(h.indexOf('中学')>=0||h.indexOf('初中')>=0)obj.middleSchool=val;
+          else if(h.indexOf('物业')>=0&&h.indexOf('费')<0)obj.propertyManagement=val;
+          else if(h.indexOf('物业费')>=0){
+            obj.propertyFees=obj.propertyFees||[];
+            obj.propertyFees.push({type:'默认',fee:val});
+          }
+        });
+        if(obj.title)results.push(obj);
+      }
+      if(results.length>0)return results;
+    }
+  }
+  /* 自由文本：按行识别，每行一个小区 */
+  lines.forEach(function(line){
+    var obj={};
+    /* 尝试提取小区名 */
+    var nameMatch=line.match(/([^\s,，、|]+)(小区|花园|公寓|苑|府|城|湾|里|邸|台)/);
+    if(nameMatch){
+      obj.title=nameMatch[0];obj.community=obj.title;
+    }
+    /* 提取区域 */
+    var districtMatch=line.match(/(临平|余杭|萧山|拱墅|西湖|上城|滨江|钱塘|富阳|临安)/);
+    if(districtMatch)obj.district=districtMatch[1];
+    /* 提取房龄 */
+    var ageMatch=line.match(/(\d{4})\s*年/);
+    if(ageMatch)obj.buildingAge=ageMatch[1]+'年';
+    /* 提取楼幢 */
+    var bldMatch=line.match(/(\d+)\s*[幢栋]/);
+    if(bldMatch)obj.buildingCount=bldMatch[1]+'幢';
+    /* 提取户数 */
+    var hhMatch=line.match(/(\d+)\s*户/);
+    if(hhMatch)obj.householdCount=hhMatch[1]+'户';
+    if(obj.title)results.push(obj);
+  });
+  return results;
+}
+
 function renderPropertyTable(){
   try{
   var list=getFilteredProperties();
@@ -3000,8 +3494,70 @@ function renderPropertyTable(){
     +'<div style="font-size:.75rem;color:var(--text-muted)">💡 提示：按楼盘名字自动去重，重复楼盘默认排除</div>'
     +'</div>';
 
-  var html=toolbarHtml
-    +'<div class="client-table-wrap"><table class="client-table"><thead><tr>'
+  var isSh=(S.subtab==='secondhand');
+  var isRt=(S.subtab==='rental');
+  var isShOrRt=isSh||isRt;
+
+  var html=toolbarHtml;
+  if(isShOrRt){
+    /* 二手房/租赁房表格 */
+    html+='<div class="client-table-wrap"><table class="client-table"><thead><tr>'
+      +'<th style="width:32px"><input type="checkbox" disabled '+(checkedCount>0&&checkedCount===list.length?'checked':'')+'></th>'
+      +'<th>行政区</th>'
+      +'<th>小区</th>'
+      +'<th>楼幢</th>'
+      +'<th>单元</th>'
+      +'<th>房间号</th>'
+      +'<th>面积(㎡)</th>'
+      +'<th>户型</th>'
+      +(isRt?'<th>月租(元)</th><th>押付</th><th>租赁方式</th>':'<th>总价(万)</th><th>单价(元/㎡)</th>')
+      +'<th>装修</th>'
+      +'<th>朝向</th>'
+      +'<th>建成年代</th>'
+      +'<th>状态</th>'
+      +'<th>业主</th>'
+      +'<th>电话</th>'
+      +'<th>操作</th>'
+      +'</tr></thead><tbody>';
+    for(var i=0;i<list.length;i++){
+      var p=list[i];
+      var propPinned=(S.pinnedPropIds||[]).indexOf(p.id)>=0;
+      var isChecked=(S.checkedPropIds||[]).indexOf(p.id)>=0;
+      var rowCls=[];
+      if(propPinned)rowCls.push('is-pinned');
+      if(p.status==='下架')rowCls.push('invalid');
+      if(p.status==='已售'||p.status==='售罄'||p.status==='已租')rowCls.push('is-completed');
+      var locTitle=(p.community||'')+(p.building?(' '+p.building):'')+(p.unit?(' '+p.unit):'')+(p.room?(' '+p.room):'');
+      html+='<tr data-id="'+p.id+'"'+(rowCls.length?' class="'+rowCls.join(' ')+'"':'')+'>'
+        +'<td><input type="checkbox" class="prop-check" data-prop-check-id="'+p.id+'" '+(isChecked?'checked':'')+'></td>'
+        +'<td>'+(p.district?'<span class="ct-area">'+esc(p.district)+'</span>':'<span style="color:var(--gray-400)">—</span>')+'</td>'
+        +'<td><span class="ct-name" title="'+esc(locTitle)+'">'+esc(p.community||'—')+'</span></td>'
+        +'<td>'+esc(p.building||'—')+'</td>'
+        +'<td>'+esc(p.unit||'—')+'</td>'
+        +'<td>'+esc(p.room||'—')+'</td>'
+        +'<td>'+(p.area?esc(p.area):'—')+'</td>'
+        +'<td>'+esc(p.layout||'—')+'</td>';
+      if(isRt){
+        html+='<td><span class="ct-budget" style="color:var(--primary)">'+(p.rentPrice?esc(p.rentPrice):'—')+'</span></td>'
+          +'<td>'+esc(p.depositType||'—')+'</td>'
+          +'<td>'+esc(p.rentType||'—')+'</td>';
+      }else{
+        html+='<td><span class="ct-budget" style="color:var(--primary)">'+(p.totalPrice?esc(p.totalPrice):'—')+'</span></td>'
+          +'<td>'+(p.unitPrice?esc(p.unitPrice):'—')+'</td>';
+      }
+      html+='<td>'+esc(p.decoration||'—')+'</td>'
+        +'<td>'+esc(p.orientation||'—')+'</td>'
+        +'<td>'+esc(p.buildingAge||'—')+'</td>'
+        +'<td><span class="status-badge" data-status="'+esc(p.status)+'">'+esc(p.status)+'</span></td>'
+        +'<td>'+esc(p.ownerName||'—')+'</td>'
+        +'<td>'+(p.ownerPhone?'<a href="tel:'+esc(p.ownerPhone)+'">'+esc(p.ownerPhone)+'</a>':'—')+'</td>'
+        +'<td><button class="ct-action-btn" data-prop-view-id="'+p.id+'">详情</button><button class="ct-action-btn" data-prop-edit-id="'+p.id+'">编辑</button></td>'
+        +'</tr>';
+    }
+    html+='</tbody></table></div>';
+  }else{
+    /* 新楼盘表格（保持原逻辑） */
+    html+='<div class="client-table-wrap"><table class="client-table"><thead><tr>'
     +'<th style="width:32px"><input type="checkbox" disabled '+(checkedCount>0&&checkedCount===list.length?'checked':'')+'></th>'
     +'<th>行政区</th>'
     +'<th>项目名称</th>'
@@ -3080,6 +3636,7 @@ function renderPropertyTable(){
       +'</tr>';
   }
   html+='</tbody></table></div>';
+  } /* end else (newdev table) */
   table.innerHTML=html;
 
   /* view detail */
@@ -3190,17 +3747,30 @@ function openPropertyForm(id){
   try{
   S.editPropId=id||null;S.editPropTags=[];
   var p=id?findProp(id):{};
-  var type=id?p.type:S.subtab;
-  document.getElementById('propFormTitle').textContent=id?(type==='newdev'?'编辑楼盘':'编辑房源'):(S.subtab==='newdev'?'新增楼盘':'新增二手房');
+  var type=id?p.type:(S.subtab==='community'?'secondhand':S.subtab);
+  if(type==='community')type='secondhand';
+  document.getElementById('propFormTitle').textContent=id?(type==='newdev'?'编辑楼盘':(type==='rental'?'编辑出租房':'编辑房源')):(S.subtab==='newdev'?'新增楼盘':(S.subtab==='rental'?'新增出租房':(S.subtab==='community'?'新增小区(房源)':'新增二手房')));
   document.getElementById('pfId').value=id||'';
   document.getElementById('pfType').value=type;
   updatePropFormFields(type);
+  /* 更新板块下拉 */
+  updateFormBlockOptions(p.district||'临平',p.block);
   document.getElementById('pfTitle').value=p.title||'';
   document.getElementById('pfCommunity').value=p.community||'';
   document.getElementById('pfDeveloper').value=p.developer||'';
   document.getElementById('pfDistrict').value=p.district||'临平';
   document.getElementById('pfAddress').value=p.address||'';
   document.getElementById('pfTotalPrice').value=p.totalPrice||'';
+  document.getElementById('pfRentPrice').value=p.rentPrice||'';
+  document.getElementById('pfDepositType').value=p.depositType||'';
+  document.getElementById('pfRentType').value=p.rentType||'';
+  document.getElementById('pfLeaseTerm').value=p.leaseTerm||'';
+  document.getElementById('pfRentStatus').value=p.rentStatus||'空置待租';
+  document.getElementById('pfMinLease').value=p.minLease||'';
+  document.getElementById('pfMoveInDate').value=p.moveInDate||'';
+  document.getElementById('pfBuilding').value=p.building||'';
+  document.getElementById('pfUnit').value=p.unit||'';
+  document.getElementById('pfRoom').value=p.room||'';
   document.getElementById('pfArea').value=p.area||'';
   document.getElementById('pfUnitPrice').value=p.unitPrice||'';
   document.getElementById('pfLayout').value=p.layout||'';
@@ -3234,11 +3804,10 @@ function openPropertyForm(id){
   document.getElementById('pfViewingRule').value=p.viewingRule||'';
   document.getElementById('pfBusinessDistrict').value=p.businessDistrict||'';
   document.getElementById('pfProjectTag').value=p.projectTag||'';
-  /* 注：pfPropertyFee 这个 DOM id 保留兼容，实际存储到 propertyType 字段（物业类型：普通住宅/别墅/商业 等） */
   document.getElementById('pfPropertyFee').value=p.propertyType||p.propertyFee||'';
-  document.getElementById('pfStatus').value=p.status||(type==='secondhand'?'在售':'待售');
+  document.getElementById('pfStatus').value=p.status||(type==='secondhand'?'在售':(type==='rental'?'空置待租':'待售'));
   document.getElementById('pfDesc').value=p.description||'';
-  /* 封面选择器：编辑已有房源且有图片时显示 */
+  /* 封面选择器 */
   var coverField=document.getElementById('pfCoverField');
   var coverGrid=document.getElementById('pfCoverGrid');
   var coverInput=document.getElementById('pfCoverMediaId');
@@ -3277,6 +3846,13 @@ function openPropertyForm(id){
   var pfMb=document.querySelector('#propFormModal .modal-body');if(pfMb)pfMb.scrollTop=0;
   }catch(err){console.error('[openPropertyForm]',err);toast('打开表单失败: '+err.message,'error')}
 }
+/* 更新表单中的板块下拉选项 */
+function updateFormBlockOptions(district,selectedBlock){
+  var blockSelect=document.getElementById('pfBlock');
+  if(!blockSelect)return;
+  var blocks=district&&AREA_BLOCKS[district]?AREA_BLOCKS[district]:[];
+  blockSelect.innerHTML='<option value="">请选择</option>'+blocks.map(function(b){return'<option value="'+esc(b)+'"'+(b===selectedBlock?' selected':'')+'>'+esc(b)+'</option>'}).join('');
+}
 function updatePropFormFields(type){
   document.querySelectorAll('[data-show]').forEach(function(el){
     var show=el.getAttribute('data-show')||'';
@@ -3312,19 +3888,39 @@ function renderAreaSegments(){
   });
 }
 function saveProperty(){
-  var title=document.getElementById('pfTitle').value.trim();
-  if(!title){toast('请输入房源名称','error');return}
   var type=document.getElementById('pfType').value;
-  if(type==='secondhand'&&!document.getElementById('pfCommunity').value.trim()){toast('请输入小区名称','error');return}
-  if(type==='secondhand'&&!document.getElementById('pfTotalPrice').value){toast('请输入总价','error');return}
+  var title='';
+  var community=document.getElementById('pfCommunity').value.trim();
+  if(type==='newdev'){
+    title=document.getElementById('pfTitle').value.trim();
+    if(!title){toast('请输入楼盘名称','error');return}
+  }else{
+    /* 二手房/租赁房：以小区名+楼幢单元房间号自动生成标题 */
+    if(!community){toast('请输入小区名称','error');return}
+    var locStr=[document.getElementById('pfBuilding').value.trim(),document.getElementById('pfUnit').value.trim(),document.getElementById('pfRoom').value.trim()].filter(Boolean).join(' ');
+    title=community+(locStr?(' '+locStr):'');
+    if(type==='secondhand'&&!document.getElementById('pfTotalPrice').value){toast('请输入总价','error');return}
+    if(type==='rental'&&!document.getElementById('pfRentPrice').value){toast('请输入月租金','error');return}
+  }
   if(type==='newdev'&&!document.getElementById('pfAvgPrice').value){toast('请输入均价','error');return}
   var id=document.getElementById('pfId').value;var isEdit=!!id;var p=isEdit?findProp(id):{};
   p.type=type;p.title=title;
-  p.community=document.getElementById('pfCommunity').value.trim();
+  p.community=community;
   p.developer=document.getElementById('pfDeveloper').value.trim();
   p.district=document.getElementById('pfDistrict').value;
+  p.block=document.getElementById('pfBlock').value||'';
   p.address=document.getElementById('pfAddress').value.trim();
   p.totalPrice=parseFloat(document.getElementById('pfTotalPrice').value)||0;
+  p.rentPrice=parseInt(document.getElementById('pfRentPrice').value)||0;
+  p.depositType=document.getElementById('pfDepositType').value;
+  p.rentType=document.getElementById('pfRentType').value;
+  p.leaseTerm=document.getElementById('pfLeaseTerm').value.trim();
+  p.rentStatus=document.getElementById('pfRentStatus').value;
+  p.minLease=document.getElementById('pfMinLease').value.trim();
+  p.moveInDate=document.getElementById('pfMoveInDate').value.trim();
+  p.building=document.getElementById('pfBuilding').value.trim();
+  p.unit=document.getElementById('pfUnit').value.trim();
+  p.room=document.getElementById('pfRoom').value.trim();
   p.area=parseFloat(document.getElementById('pfArea').value)||0;
   p.unitPrice=p.area>0?Math.round(p.totalPrice*10000/p.area):0;
   p.layout=document.getElementById('pfLayout').value.trim();
@@ -3358,7 +3954,6 @@ function saveProperty(){
   p.viewingRule=document.getElementById('pfViewingRule').value.trim();
   p.businessDistrict=document.getElementById('pfBusinessDistrict').value.trim();
   p.projectTag=document.getElementById('pfProjectTag').value.trim();
-  /* 物业类型字段：保留 pfPropertyFee 这个 DOM id（HTML表单），实际存到 propertyType */
   p.propertyType=document.getElementById('pfPropertyFee').value.trim();
   p.propertyFee='';
   p.status=document.getElementById('pfStatus').value;
@@ -3366,24 +3961,44 @@ function saveProperty(){
   p.coverMediaId=document.getElementById('pfCoverMediaId').value||null;
   p.tags=S.editPropTags.slice();p.showroomAreas=S.editAreaSegs.slice();p.updatedAt=now();
   if(!isEdit){p.id=uuid();p.createdAt=now();p.linkedClientIds=[];S.properties.push(p)}
-  saveP();closeModal('propFormModal');renderPropertyList();toast(isEdit?'房源已更新':'房源已添加','success');
+  saveP();closeModal('propFormModal');
+  if(S.subtab==='community'){renderCommunityList()}else{renderPropertyList()}
+  toast(isEdit?'房源已更新':'房源已添加','success');
 }
 
 /* ========== Property: Detail ========== */
 function showPropertyDetail(id){
   var p=findProp(id);if(!p)return;S.curPropId=id;
-  var price=p.type==='secondhand'?(p.totalPrice?p.totalPrice+'万':'面议'):(p.averagePrice?p.averagePrice+'元/㎡':'面议');
-  var infoItems=p.type==='secondhand'?[
-    di('小区',p.community),di('面积',p.area?p.area+'㎡':'—'),di('户型',p.layout),di('楼层',p.floor+(p.totalFloors?'/'+p.totalFloors+'层':'')),
-    di('朝向',p.orientation),di('装修',p.decoration),di('单价',p.unitPrice?p.unitPrice+'元/㎡':'—'),di('建成年代',p.buildingAge),
-    di('产权',p.propertyRights),di('钥匙',p.hasKey?'有':'无'),di('看房',p.viewingMethod),di('学区',p.school),di('地铁',p.metro),di('业主',p.ownerName),di('业主电话',p.ownerPhone)
-  ]:[
-    di('开发商',p.developer),di('均价',p.averagePrice?p.averagePrice+'元/㎡':'—'),di('起步总价',p.totalPrice?p.totalPrice+'万':'—'),di('物业类型',p.propertyType),
-    di('面积段',p.availableLayouts),di('装修',p.decoration),di('剩余房源',p.remaining),
-    di('开盘时间',p.openingDate),di('交付时间',p.deliveryDate),di('总户数',p.totalUnits),di('绿化率',p.greenRate),di('容积率',p.plotRatio),
-    di('地铁',p.metro),di('对接人',p.contactName),di('联系电话',p.contactPhone),di('佣金',p.commission||'—'),
-    di('保护期',p.protectionPeriod)
-  ];
+  var price;var infoItems;var typeLabel;
+  if(p.type==='rental'){
+    price=p.rentPrice?p.rentPrice+'元/月':'面议';typeLabel='租赁房';
+    infoItems=[
+      di('小区',p.community||'\u2014'),di('楼幢',p.building||'\u2014'),di('单元',p.unit||'\u2014'),di('房间号',p.room||'\u2014'),
+      di('面积',p.area?p.area+'\u33a1':'\u2014'),di('户型',p.layout||'\u2014'),di('楼层',p.floor?(p.floor+(p.totalFloors?'/'+p.totalFloors+'层':'')):'\u2014'),
+      di('朝向',p.orientation||'\u2014'),di('装修',p.decoration||'\u2014'),di('押付方式',p.depositType||'\u2014'),
+      di('租赁方式',p.rentType||'\u2014'),di('租期',p.leaseTerm||'\u2014'),di('出租状态',p.rentStatus||'\u2014'),
+      di('最短租期',p.minLease||'\u2014'),di('入住时间',p.moveInDate||'\u2014'),
+      di('建成年代',p.buildingAge||'\u2014'),di('钥匙',p.hasKey?'有':'无'),di('看房',p.viewingMethod||'\u2014'),
+      di('学区',p.school||'\u2014'),di('地铁',p.metro||'\u2014'),di('业主',p.ownerName||'\u2014'),di('业主电话',p.ownerPhone||'\u2014')
+    ];
+  }else if(p.type==='secondhand'){
+    price=p.totalPrice?p.totalPrice+'万':'面议';typeLabel='二手房';
+    infoItems=[
+      di('小区',p.community||'\u2014'),di('楼幢',p.building||'\u2014'),di('单元',p.unit||'\u2014'),di('房间号',p.room||'\u2014'),
+      di('面积',p.area?p.area+'\u33a1':'\u2014'),di('户型',p.layout||'\u2014'),di('楼层',p.floor?(p.floor+(p.totalFloors?'/'+p.totalFloors+'层':'')):'\u2014'),
+      di('朝向',p.orientation||'\u2014'),di('装修',p.decoration||'\u2014'),di('单价',p.unitPrice?p.unitPrice+'元/\u33a1':'\u2014'),di('建成年代',p.buildingAge||'\u2014'),
+      di('产权',p.propertyRights||'\u2014'),di('钥匙',p.hasKey?'有':'无'),di('看房',p.viewingMethod||'\u2014'),di('学区',p.school||'\u2014'),di('地铁',p.metro||'\u2014'),di('业主',p.ownerName||'\u2014'),di('业主电话',p.ownerPhone||'\u2014')
+    ];
+  }else{
+    price=p.averagePrice?p.averagePrice+'元/\u33a1':'面议';typeLabel='新楼盘';
+    infoItems=[
+      di('开发商',p.developer||'\u2014'),di('均价',p.averagePrice?p.averagePrice+'元/\u33a1':'\u2014'),di('起步总价',p.totalPrice?p.totalPrice+'万':'\u2014'),di('物业类型',p.propertyType||'\u2014'),
+      di('面积段',p.availableLayouts||'\u2014'),di('装修',p.decoration||'\u2014'),di('剩余房源',p.remaining||'\u2014'),
+      di('开盘时间',p.openingDate||'\u2014'),di('交付时间',p.deliveryDate||'\u2014'),di('总户数',p.totalUnits||'\u2014'),di('绿化率',p.greenRate||'\u2014'),di('容积率',p.plotRatio||'\u2014'),
+      di('地铁',p.metro||'\u2014'),di('对接人',p.contactName||'\u2014'),di('联系电话',p.contactPhone||'\u2014'),di('佣金',p.commission||'\u2014'),
+      di('保护期',p.protectionPeriod||'\u2014')
+    ];
+  }
   var tagsHtml=(p.tags||[]).map(function(t){return'<span class="client-tag">'+esc(t)+'</span>'}).join('');
   var matchedClients=getMatchedClients(id);
   var matchedHtml=matchedClients.map(function(c){
@@ -3391,7 +4006,7 @@ function showPropertyDetail(id){
   }).join('')||'<div class="timeline-empty">暂无匹配客户</div>';
   document.getElementById('propDetailBody').innerHTML=
     '<div class="media-section"><div class="media-upload-area" id="mediaUpload"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin:0 auto;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><p>点击或拖拽上传图片/视频</p><div class="hint">支持 JPG/PNG/MP4 等，图片自动压缩</div></div><div class="media-gallery" id="mediaGallery"></div></div>'
-    +'<div class="detail-header"><div class="detail-avatar" style="background:var(--success-light);color:var(--success)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><div class="detail-info"><h2>'+esc(p.title)+'</h2><div class="sub">'+esc(p.district)+(p.address?' · '+esc(p.address):'')+'</div><div class="detail-badges"><span class="status-badge" data-status="'+esc(p.status)+'">'+esc(p.status)+'</span><span class="status-badge" data-status="已联系">'+(p.type==='secondhand'?'二手房':'新楼盘')+'</span></div></div></div>'
+    +'<div class="detail-header"><div class="detail-avatar" style="background:var(--success-light);color:var(--success)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><div class="detail-info"><h2>'+esc(p.title)+'</h2><div class="sub">'+esc(p.district)+(p.block?(' · '+esc(p.block)):'')+(p.address?' · '+esc(p.address):'')+'</div><div class="detail-badges"><span class="status-badge" data-status="'+esc(p.status)+'">'+esc(p.status)+'</span><span class="status-badge" data-status="已联系">'+typeLabel+'</span></div></div></div>'
     +'<div class="detail-section"><div class="card-price" style="font-size:1.5rem;margin-bottom:12px">'+price+'</div><div class="detail-grid">'+infoItems.join('')+'</div></div>'
     +(tagsHtml?'<div class="detail-section"><h3>标签</h3><div class="client-tags">'+tagsHtml+'</div></div>':'')
     +(p.highlights?'<div class="detail-section"><h3>📌 基本卖点</h3><div class="timeline-content">'+esc(p.highlights)+'</div></div>':'')
@@ -3426,25 +4041,66 @@ function showPropertyDetail(id){
 }
 function handleMediaUpload(propId,files){
   var promises=[];
-  toast('正在上传…','');
+  var totalFiles=Array.from(files).length;
+  var doneCount=0;
+  toast('正在上传…（共'+totalFiles+'个文件）','');
   Array.from(files).forEach(function(file){
     if(file.type.startsWith('image/')){
       if(file.size>500*1024*1024){toast(file.name+' 超过500MB，跳过','error');return}
       promises.push(new Promise(function(resolve){
         compressImage(file,1200,0.7,function(dataUrl){
-          MediaDB.save({id:uuid(),propertyId:propId,type:'image',name:file.name,dataUrl:dataUrl}).then(resolve);
+          MediaDB.save({id:uuid(),propertyId:propId,type:'image',name:file.name,dataUrl:dataUrl}).then(function(){doneCount++;toast('已上传 '+doneCount+'/'+totalFiles,'');resolve()});
         });
       }));
     }else if(file.type.startsWith('video/')){
-      if(file.size>500*1024*1024){toast(file.name+' 超过500MB，跳过','error');return}
-      promises.push(new Promise(function(resolve){
-        fileToDataUrl(file,function(dataUrl){
-          MediaDB.save({id:uuid(),propertyId:propId,type:'video',name:file.name,dataUrl:dataUrl}).then(resolve);
-        });
-      }));
+      if(file.size>600*1024*1024){toast(file.name+' 超过600MB，跳过','error');return}
+      /* 视频：使用 raw binary 上传，避免 base64 内存爆炸 */
+      if(SYNC_ENABLED&&S.currentUser){
+        var vid=uuid();
+        promises.push(new Promise(function(resolve){
+          var xhr=new XMLHttpRequest();
+          var uploadUrl=API_BASE+'/api/media/upload-raw?id='+vid+'&propertyId='+encodeURIComponent(propId)+'&type=video&name='+encodeURIComponent(file.name);
+          xhr.upload.addEventListener('progress',function(e){
+            if(e.lengthComputable){
+              var pct=Math.round((e.loaded/e.total)*100);
+              toast('视频上传中…'+pct+'%（'+file.name+'）','');
+            }
+          });
+          xhr.addEventListener('load',function(){
+            try{
+              var resp=JSON.parse(xhr.responseText);
+              if(resp.ok){
+                /* 只保存元数据到 IndexedDB，不存 base64 */
+                MediaDB.save({id:vid,propertyId:propId,type:'video',name:file.name,serverUrl:resp.url,isRawFile:true}).then(function(){doneCount++;toast('已上传 '+doneCount+'/'+totalFiles,'');resolve()});
+              }else{
+                toast('视频上传失败：'+(resp.error||'未知错误'),'error');resolve();
+              }
+            }catch(err){toast('视频上传解析失败','error');resolve()}
+          });
+          xhr.addEventListener('error',function(){
+            toast('视频上传失败，请检查网络后重试','error');resolve();
+          });
+          xhr.addEventListener('timeout',function(){
+            toast('视频上传超时（文件可能过大）','error');resolve();
+          });
+          xhr.timeout=300000; /* 5分钟超时 */
+          xhr.open('POST',uploadUrl);
+          var auth=getAuthHeader();
+          if(auth.Authorization)xhr.setRequestHeader('Authorization',auth.Authorization);
+          xhr.send(file); /* 直接发送原始文件 */
+        }));
+      }else{
+        /* 离线模式：仍然用 base64 存 IndexedDB（仅小视频适用） */
+        if(file.size>100*1024*1024){toast(file.name+' 超过100MB，离线模式不支持大视频','error');return}
+        promises.push(new Promise(function(resolve){
+          fileToDataUrl(file,function(dataUrl){
+            MediaDB.save({id:uuid(),propertyId:propId,type:'video',name:file.name,dataUrl:dataUrl}).then(function(){doneCount++;toast('已上传 '+doneCount+'/'+totalFiles,'');resolve()});
+          });
+        }));
+      }
     }
   });
-  Promise.all(promises).then(function(){renderMediaGallery(propId);renderPropertyList();toast('上传完成','success')});
+  Promise.all(promises).then(function(){renderMediaGallery(propId);renderPropertyList();toast('上传完成（'+doneCount+'个文件）','success')});
 }
 function renderMediaGallery(propId){
   MediaDB.list(propId).then(function(mediaList){
@@ -3464,9 +4120,11 @@ function renderMediaGallery(propId){
       var catBadge=(m.category&&m.category!=='showroom'&&m.category!=='相册')?'<span class="media-cat-badge">'+esc(m.category)+'</span>':'';
       var coverBtn=m.type==='image'?'<button class="media-set-cover" data-mid="'+m.id+'" title="'+(isCover?'已是封面':'设为封面')+'">'+(isCover?'★':'☆')+'</button>':'';
       if(m.type==='image'){
-        return'<div class="media-item'+(isCover?' is-cover':'')+'" data-idx="'+i+'"><img src="'+m.dataUrl+'" loading="lazy"><span class="media-type">图片</span>'+catBadge+coverBadge+coverBtn+'<button class="media-delete" data-mid="'+m.id+'">×</button></div>';
+        var imgSrc=m.serverUrl?(API_BASE+m.serverUrl):m.dataUrl;
+        return'<div class="media-item'+(isCover?' is-cover':'')+'" data-idx="'+i+'"><img src="'+imgSrc+'" loading="lazy"><span class="media-type">图片</span>'+catBadge+coverBadge+coverBtn+'<button class="media-delete" data-mid="'+m.id+'">×</button></div>';
       }else{
-        return'<div class="media-item" data-idx="'+i+'"><video src="'+m.dataUrl+'"></video><span class="media-type">视频</span>'+coverBtn+'<button class="media-delete" data-mid="'+m.id+'">×</button></div>';
+        var vidSrc=m.serverUrl?(API_BASE+m.serverUrl):m.dataUrl;
+        return'<div class="media-item" data-idx="'+i+'"><video src="'+vidSrc+'" preload="metadata"></video><span class="media-type">视频</span>'+coverBtn+'<button class="media-delete" data-mid="'+m.id+'">×</button></div>';
       }
     }).join('');
     gallery.querySelectorAll('.media-item').forEach(function(el){
@@ -3548,28 +4206,60 @@ function setupShowroomHandlers(propId,areas){
 }
 function handleShowroomUpload(propId,area,type,files){
   var promises=[];
-  toast('正在上传…','');
+  var totalFiles=Array.from(files).length;
+  var doneCount=0;
+  toast('正在上传…（共'+totalFiles+'个文件）','');
   Array.from(files).forEach(function(file){
     if(file.type.startsWith('image/')){
       if(file.size>500*1024*1024){toast(file.name+' 超过500MB，跳过','error');return}
       promises.push(new Promise(function(resolve){
         compressImage(file,1200,0.7,function(dataUrl){
-          MediaDB.save({id:uuid(),propertyId:propId,type:'image',name:file.name,dataUrl:dataUrl,category:'showroom',showroomArea:area,showroomType:type}).then(resolve);
+          MediaDB.save({id:uuid(),propertyId:propId,type:'image',name:file.name,dataUrl:dataUrl,category:'showroom',showroomArea:area,showroomType:type}).then(function(){doneCount++;resolve()});
         });
       }));
     }else if(file.type.startsWith('video/')){
-      if(file.size>500*1024*1024){toast(file.name+' 超过500MB，跳过','error');return}
-      promises.push(new Promise(function(resolve){
-        fileToDataUrl(file,function(dataUrl){
-          MediaDB.save({id:uuid(),propertyId:propId,type:'video',name:file.name,dataUrl:dataUrl,category:'showroom',showroomArea:area,showroomType:type}).then(resolve);
-        });
-      }));
+      if(file.size>600*1024*1024){toast(file.name+' 超过600MB，跳过','error');return}
+      if(SYNC_ENABLED&&S.currentUser){
+        var vid=uuid();
+        promises.push(new Promise(function(resolve){
+          var xhr=new XMLHttpRequest();
+          var uploadUrl=API_BASE+'/api/media/upload-raw?id='+vid+'&propertyId='+encodeURIComponent(propId)+'&type=video&name='+encodeURIComponent(file.name)+'&category=showroom&showroomArea='+encodeURIComponent(area)+'&showroomType='+encodeURIComponent(type);
+          xhr.upload.addEventListener('progress',function(e){
+            if(e.lengthComputable){
+              var pct=Math.round((e.loaded/e.total)*100);
+              toast('视频上传中…'+pct+'%','');
+            }
+          });
+          xhr.addEventListener('load',function(){
+            try{
+              var resp=JSON.parse(xhr.responseText);
+              if(resp.ok){
+                MediaDB.save({id:vid,propertyId:propId,type:'video',name:file.name,serverUrl:resp.url,isRawFile:true,category:'showroom',showroomArea:area,showroomType:type}).then(function(){doneCount++;resolve()});
+              }else{toast('视频上传失败','error');resolve()}
+            }catch(err){toast('视频上传解析失败','error');resolve()}
+          });
+          xhr.addEventListener('error',function(){toast('视频上传失败，请重试','error');resolve()});
+          xhr.addEventListener('timeout',function(){toast('视频上传超时','error');resolve()});
+          xhr.timeout=300000;
+          xhr.open('POST',uploadUrl);
+          var auth=getAuthHeader();
+          if(auth.Authorization)xhr.setRequestHeader('Authorization',auth.Authorization);
+          xhr.send(file);
+        }));
+      }else{
+        if(file.size>100*1024*1024){toast(file.name+' 超过100MB，离线模式不支持大视频','error');return}
+        promises.push(new Promise(function(resolve){
+          fileToDataUrl(file,function(dataUrl){
+            MediaDB.save({id:uuid(),propertyId:propId,type:'video',name:file.name,dataUrl:dataUrl,category:'showroom',showroomArea:area,showroomType:type}).then(function(){doneCount++;resolve()});
+          });
+        }));
+      }
     }
   });
   Promise.all(promises).then(function(){
     var prefix=type==='experience'?'Exp':'Del';
     renderShowroomGallery(propId,area,type,prefix,areaId(area));
-    toast('上传完成','success');
+    toast('上传完成（'+doneCount+'个文件）','success');
   });
 }
 function renderShowroomGallery(propId,area,type,prefix,aid){
@@ -3585,9 +4275,11 @@ function renderShowroomGallery(propId,area,type,prefix,aid){
     }
     gallery.innerHTML=mediaList.map(function(m,i){
       if(m.type==='image'){
-        return'<div class="media-item" data-sr-idx="'+i+'"><img src="'+m.dataUrl+'" loading="lazy"><button class="media-delete" data-sr-mid="'+m.id+'">×</button></div>';
+        var imgSrc=m.serverUrl?(API_BASE+m.serverUrl):m.dataUrl;
+        return'<div class="media-item" data-sr-idx="'+i+'"><img src="'+imgSrc+'" loading="lazy"><button class="media-delete" data-sr-mid="'+m.id+'">×</button></div>';
       }else{
-        return'<div class="media-item" data-sr-idx="'+i+'"><video src="'+m.dataUrl+'"></video><span class="media-type">视频</span><button class="media-delete" data-sr-mid="'+m.id+'">×</button></div>';
+        var vidSrc=m.serverUrl?(API_BASE+m.serverUrl):m.dataUrl;
+        return'<div class="media-item" data-sr-idx="'+i+'"><video src="'+vidSrc+'" preload="metadata"></video><span class="media-type">视频</span><button class="media-delete" data-sr-mid="'+m.id+'">×</button></div>';
       }
     }).join('');
     // Store media list for lightbox
@@ -3617,14 +4309,15 @@ function renderLightbox(){
   var m=S.mediaList[S.mediaIdx];
   if(!m)return;
   var el=document.getElementById('lbContent');
+  var src=m.serverUrl?(API_BASE+m.serverUrl):m.dataUrl;
   if(m.type==='image'){
-    el.innerHTML='<img src="'+m.dataUrl+'">'
+    el.innerHTML='<img src="'+src+'">'
     +'<div class="lb-download-bar"><button class="lb-download-btn" id="lbDownloadImg">下载图片（带水印）</button></div>';
     var dlBtn=document.getElementById('lbDownloadImg');
     if(dlBtn)dlBtn.addEventListener('click',function(){downloadImageWithWatermark(m)});
   }
   else{
-    el.innerHTML='<video src="'+m.dataUrl+'" controls autoplay></video>'
+    el.innerHTML='<video src="'+src+'" controls autoplay></video>'
     +'<div class="lb-download-bar"><button class="lb-download-btn" id="lbDownloadVideo">下载视频（带水印）</button></div>';
     var dlVBtn=document.getElementById('lbDownloadVideo');
     if(dlVBtn)dlVBtn.addEventListener('click',function(){downloadVideoWithWatermark(m)});
@@ -3670,19 +4363,29 @@ function downloadImageWithWatermark(m){
       toast('图片已下载','success');
     },'image/jpeg',0.9);
   };
-  img.src=m.dataUrl;
+  img.src=m.serverUrl?(API_BASE+m.serverUrl):m.dataUrl;
+  img.crossOrigin='anonymous';
 }
 
 function downloadVideoWithWatermark(m){
+  var videoSrc=m.serverUrl?(API_BASE+m.serverUrl):m.dataUrl;
   if(typeof MediaRecorder==='undefined'||!HTMLCanvasElement.prototype.captureStream){
     // 不支持Canvas录制，直接下载原始文件
     toast('浏览器不支持水印录制，下载原视频…','');
-    downloadDataUrl(m.dataUrl,(m.name||'video').replace(/\.[^.]+$/,'')+'.mp4');
+    if(m.serverUrl){
+      /* 从服务器下载原始文件 */
+      var a=document.createElement('a');
+      a.href=API_BASE+'/api/media/download/'+m.id+'?token='+(S.authToken||'');
+      a.download=(m.name||'video').replace(/\.[^.]+$/,'')+'.mp4';
+      document.body.appendChild(a);a.click();a.remove();
+    }else{
+      downloadDataUrl(m.dataUrl,(m.name||'video').replace(/\.[^.]+$/,'')+'.mp4');
+    }
     return;
   }
   toast('正在生成带水印视频，请勿关闭页面…','');
   var video=document.createElement('video');
-  video.src=m.dataUrl;
+  video.src=videoSrc;
   video.muted=true;
   video.playsInline=true;
   video.crossOrigin='anonymous';
@@ -3770,32 +4473,53 @@ function downloadDataUrl(dataUrl,filename){
 function copyPropertyInfo(id){
   var p=findProp(id);if(!p)return;
   var text='';
-  if(p.type==='secondhand'){
-    text='【'+p.title+'】\n'+
-      (p.community?'小区：'+p.community+'\n':'')+
-      (p.area?'面积：'+p.area+'㎡\n':'')+
-      (p.layout?'户型：'+p.layout+'\n':'')+
-      (p.floor?'楼层：'+p.floor+(p.totalFloors?'/'+p.totalFloors+'层':'')+'\n':'')+
-      (p.orientation?'朝向：'+p.orientation+'\n':'')+
-      (p.decoration?'装修：'+p.decoration+'\n':'')+
-      (p.totalPrice?'总价：'+p.totalPrice+'万\n':'')+
-      (p.unitPrice?'单价：'+p.unitPrice+'元/㎡\n':'')+
-      '位置：'+(p.district||'')+(p.address?' '+p.address:'')+'\n'+
-      (p.school?'学区：'+p.school+'\n':'')+
-      (p.metro?'地铁：'+p.metro+'\n':'')+
+  var sig='—— '+(S.currentUser?S.currentUser.name:'')+(S.currentUser&&S.currentUser.phone?' '+S.currentUser.phone:'');
+  if(p.type==='rental'){
+    text='\u3010'+p.title+'\u3011\n'+
+      (p.community?'\u5c0f\u533a\uff1a'+p.community+'\n':'')+
+      (p.building?'\u697c\u5e62\uff1a'+p.building+'\u3002':'')+(p.unit?p.unit+'\u3002':'')+(p.room?p.room+'\n':'\n')+
+      (p.area?'\u9762\u79ef\uff1a'+p.area+'\u33a1\n':'')+
+      (p.layout?'\u6237\u578b\uff1a'+p.layout+'\n':'')+
+      (p.floor?'\u697c\u5c42\uff1a'+p.floor+(p.totalFloors?'/'+p.totalFloors+'\u5c42':'')+'\n':'')+
+      (p.orientation?'\u671d\u5411\uff1a'+p.orientation+'\n':'')+
+      (p.decoration?'\u88c5\u4fee\uff1a'+p.decoration+'\n':'')+
+      (p.rentPrice?'\u6708\u79df\uff1a'+p.rentPrice+'\u5143/\u6708\n':'')+
+      (p.depositType?'\u62bc\u4ed8\uff1a'+p.depositType+'\n':'')+
+      (p.rentType?'\u79df\u8d41\u65b9\u5f0f\uff1a'+p.rentType+'\n':'')+
+      (p.leaseTerm?'\u79df\u671f\uff1a'+p.leaseTerm+'\n':'')+
+      (p.rentStatus?'\u72b6\u6001\uff1a'+p.rentStatus+'\n':'')+
+      (p.moveInDate?'\u5165\u4f4f\u65f6\u95f4\uff1a'+p.moveInDate+'\n':'')+
+      '\u4f4d\u7f6e\uff1a'+(p.district||'')+(p.block?'\u00b7'+p.block:'')+(p.address?' '+p.address:'')+'\n'+
+      (p.metro?'\u5730\u94c1\uff1a'+p.metro+'\n':'')+
       (p.description?'\n'+p.description:'')+
-      '\n\n—— '+(S.currentUser?S.currentUser.name:'小闻哥')+(S.currentUser&&S.currentUser.phone?'·'+S.currentUser.phone:'·杭州房产');
+      '\n\n'+sig;
+  }else if(p.type==='secondhand'){
+    text='\u3010'+p.title+'\u3011\n'+
+      (p.community?'\u5c0f\u533a\uff1a'+p.community+'\n':'')+
+      (p.building?'\u697c\u5e62\uff1a'+p.building+'\u3002':'')+(p.unit?p.unit+'\u3002':'')+(p.room?p.room+'\n':'\n')+
+      (p.area?'\u9762\u79ef\uff1a'+p.area+'\u33a1\n':'')+
+      (p.layout?'\u6237\u578b\uff1a'+p.layout+'\n':'')+
+      (p.floor?'\u697c\u5c42\uff1a'+p.floor+(p.totalFloors?'/'+p.totalFloors+'\u5c42':'')+'\n':'')+
+      (p.orientation?'\u671d\u5411\uff1a'+p.orientation+'\n':'')+
+      (p.decoration?'\u88c5\u4fee\uff1a'+p.decoration+'\n':'')+
+      (p.totalPrice?'\u603b\u4ef7\uff1a'+p.totalPrice+'\u4e07\n':'')+
+      (p.unitPrice?'\u5355\u4ef7\uff1a'+p.unitPrice+'\u5143/\u33a1\n':'')+
+      '\u4f4d\u7f6e\uff1a'+(p.district||'')+(p.block?'\u00b7'+p.block:'')+(p.address?' '+p.address:'')+'\n'+
+      (p.school?'\u5b66\u533a\uff1a'+p.school+'\n':'')+
+      (p.metro?'\u5730\u94c1\uff1a'+p.metro+'\n':'')+
+      (p.description?'\n'+p.description:'')+
+      '\n\n'+sig;
   }else{
-    text='【'+p.title+'】\n'+
-      (p.developer?'开发商：'+p.developer+'\n':'')+
-      '区域：'+(p.district||'')+'\n'+
-      (p.averagePrice?'均价：'+p.averagePrice+'元/㎡\n':'')+
-      (p.openingDate?'开盘：'+p.openingDate+'\n':'')+
-      (p.deliveryDate?'交房：'+p.deliveryDate+'\n':'')+
-      (p.availableLayouts?'在售户型：'+p.availableLayouts+'\n':'')+
-      '位置：'+(p.district||'')+(p.address?' '+p.address:'')+'\n'+
+    text='\u3010'+p.title+'\u3011\n'+
+      (p.developer?'\u5f00\u53d1\u5546\uff1a'+p.developer+'\n':'')+
+      '\u533a\u57df\uff1a'+(p.district||'')+(p.block?'\u00b7'+p.block:'')+'\n'+
+      (p.averagePrice?'\u5747\u4ef7\uff1a'+p.averagePrice+'\u5143/\u33a1\n':'')+
+      (p.openingDate?'\u5f00\u76d8\uff1a'+p.openingDate+'\n':'')+
+      (p.deliveryDate?'\u4ea4\u623f\uff1a'+p.deliveryDate+'\n':'')+
+      (p.availableLayouts?'\u5728\u552e\u6237\u578b\uff1a'+p.availableLayouts+'\n':'')+
+      '\u4f4d\u7f6e\uff1a'+(p.district||'')+(p.address?' '+p.address:'')+'\n'+
       (p.description?'\n'+p.description:'')+
-      '\n\n—— '+(S.currentUser?S.currentUser.name:'小闻哥')+(S.currentUser&&S.currentUser.phone?'·'+S.currentUser.phone:'·杭州房产');
+      '\n\n'+sig;
   }
   if(navigator.clipboard){
     navigator.clipboard.writeText(text).then(function(){toast('已复制到剪贴板，可粘贴到微信发送','success')}).catch(function(){fallbackCopy(text)});
@@ -4196,19 +4920,32 @@ function setupHandlers(){
   // Property filters
   function bpf(id,key){document.getElementById(id).addEventListener('change',function(){S.propFilters[key]=this.value;renderPropertyList()})}
   bpf('pfFilterArea','area');
+  /* 区域联动：更新板块下拉 */
+  var pfFilterAreaEl=document.getElementById('pfFilterArea');
+  if(pfFilterAreaEl)pfFilterAreaEl.addEventListener('change',function(){updateBlockOptions(S.subtab)});
   bpf('pfFilterAreaSeg','areaSeg');
   bpf('pfFilterUnitPrice','unitPrice');
   bpf('pfFilterTotalPrice','totalPrice');
   bpf('pfFilterDecoration','decoration');
   bpf('pfFilterSpecial','special');
+  /* 板块/商圈筛选 */
+  sb('pfFilterBlock','change',function(){S.propFilters.block=this.value;renderPropertyList()});
+  /* 楼幢单元房间号筛选 */
+  sb('pfFilterBuilding','input',function(){S.propFilters.building=this.value.trim();renderPropertyList()});
+  sb('pfFilterUnit','input',function(){S.propFilters.unit=this.value.trim();renderPropertyList()});
+  sb('pfFilterRoom','input',function(){S.propFilters.room=this.value.trim();renderPropertyList()});
   document.getElementById('pfFilterTag').addEventListener('input',function(){S.propFilters.tag=this.value.trim();renderPropertyList()});
   document.getElementById('pfFilterCommunity').addEventListener('input',function(){S.propFilters.community=this.value.trim();renderPropertyList()});
   document.getElementById('pfFilterMetro').addEventListener('input',function(){S.propFilters.metro=this.value.trim();renderPropertyList()});
+  /* 表单中区域联动板块 */
+  var pfDistrictEl=document.getElementById('pfDistrict');
+  if(pfDistrictEl)pfDistrictEl.addEventListener('change',function(){updateFormBlockOptions(this.value,'')});
   document.getElementById('propFilterReset').addEventListener('click',function(){
     S.propFilters={};
-    ['pfFilterArea','pfFilterAreaSeg','pfFilterUnitPrice','pfFilterTotalPrice','pfFilterDecoration','pfFilterTag','pfFilterSpecial','pfFilterCommunity','pfFilterMetro'].forEach(function(id){
+    ['pfFilterArea','pfFilterAreaSeg','pfFilterUnitPrice','pfFilterTotalPrice','pfFilterDecoration','pfFilterTag','pfFilterSpecial','pfFilterCommunity','pfFilterMetro','pfFilterBlock','pfFilterBuilding','pfFilterUnit','pfFilterRoom'].forEach(function(id){
       var el=document.getElementById(id);if(el)el.value='';
     });
+    updateBlockOptions(S.subtab);
     renderPropertyList();
   });
   document.getElementById('propSortSelect').addEventListener('change',function(){S.propSort=this.value;renderPropertyList()});
@@ -4260,8 +4997,12 @@ function setupHandlers(){
     if(e.target.files[0])handleSmartFileUpload(e.target.files[0],'smartFileHint');
     e.target.value='';
   });
-  document.getElementById('addPropBtn').addEventListener('click',function(){openPropertyForm()});
-  document.getElementById('smartPropInputBtn').addEventListener('click',openSmartPropInput);
+  document.getElementById('addPropBtn').addEventListener('click',function(){
+    if(S.subtab==='community'){openCommunityForm('')}else{openPropertyForm()}
+  });
+  document.getElementById('smartPropInputBtn').addEventListener('click',function(){
+    if(S.subtab==='community'){openCommunitySmartInput()}else{openSmartPropInput()}
+  });
   /* smart prop paste: capture images from clipboard */
   document.getElementById('smartPropArea').addEventListener('paste',function(e){
     var items=e.clipboardData.items;
