@@ -1696,6 +1696,11 @@ function preprocessOcrText(text){
         }else{break}
       }else{break}
     }
+    /* 2.5) 中文OCR漏字容错：压缩"中文+空格+中文"模式
+            例："绿荷 翠翠轩"（"叠"被OCR识别成空格） → "绿荷翠翠轩"
+            例："湘 湖 怡景" → "湘湖怡景"
+            只压缩中文字符之间的空格（避免破坏"小区 XXX"这种标签+值结构，因为前面已被剥离） */
+    preserved=preserved.replace(/([\u4e00-\u9fa5])\s+([\u4e00-\u9fa5])/g,'$1$2');
     /* 3) 去除行内的噪声子串 */
     for(var k=0;k<OCR_NOISE_SUBSTR.length;k++){
       preserved=preserved.split(OCR_NOISE_SUBSTR[k]).join('');
@@ -1704,7 +1709,70 @@ function preprocessOcrText(text){
     if(!preserved||isOcrNoiseLine(preserved))continue;
     cleanLines.push(preserved);
   }
-  return cleanLines.join('\n');
+  /* 第二阶段：行级拆解 — 把"业主 电话 X / Y"这类含多字段的行拆成多个独立字段行 */
+  return expandSmartPropLines(cleanLines.join('\n'));
+}
+
+/* 把"多字段杂糅在一行"的OCR文本拆成多个独立字段行，便于后续按行解析
+   关键场景（用户绿荷叠翠轩截图）：
+   1. "业主 电话 18368857920 / 18868605857" → "业主电话: 18368857920" + "业主电话: 18868605857"
+   2. "18368857920 / 18868605857"             → "18368857920" + "18868605857"
+   3. "小区 绿荷 翠翠轩" → 已经被 preprocessOcrText 阶段剥离成 "绿荷翠翠轩"
+   4. "物业 地址 16-1703" → "16-1703"（"物业地址"是 FIELD_LABELS 标签，但被拆成 "物业"和"地址"两个独立词，
+      剥离循环会把"物业"识别为标签但"物业"不在FIELD_LABELS中（只有"物业地址"），所以保留整行；
+      这里特殊处理：如果整行匹配"物业地址+数字"模式，直接提取数字作为房号）*/
+function expandSmartPropLines(text){
+  if(!text)return'';
+  var lines=text.split(/\n/);
+  var outLines=[];
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    if(!line){outLines.push(line);continue}
+
+    /* 模式A：行尾是"标签+两个电话号"格式（如"业主 电话 18368857920 / 18868605857"）
+       提取两个电话号，每个变成一行 "业主电话: 号码" */
+    var labelPrefix=line.match(/^([\u4e00-\u9fa5]{2,8})\s+(\d{11})[\s\/／,，]+(\d{11})\s*$/);
+    if(labelPrefix){
+      var lbl=labelPrefix[1];
+      var ph1=labelPrefix[2];
+      var ph2=labelPrefix[3];
+      /* 提取核心标签（去掉"电话/业主"等后缀，避免重复添加） */
+      var coreLabel=lbl;
+      /* 标准化标签：小区/业主/物业等 */
+      if(/^业主/.test(lbl)||/电话/.test(lbl)||/手机/.test(lbl)){
+        outLines.push('业主电话: '+ph1);
+        outLines.push('业主电话: '+ph2);
+      }else{
+        outLines.push(lbl+': '+ph1);
+        outLines.push(lbl+': '+ph2);
+      }
+      continue;
+    }
+
+    /* 模式B：单纯两个电话号行（"18368857920 / 18868605857"） */
+    var dualPhone=line.match(/^(\d{11})[\s\/／,，]+(\d{11})\s*$/);
+    if(dualPhone){
+      outLines.push(dualPhone[1]);
+      outLines.push(dualPhone[2]);
+      continue;
+    }
+
+    /* 模式C："物业 地址 X" 或 "物业地址X" 后面紧跟数字（房号）
+       整行提取数字部分作为房号 */
+    var propAddrMatch=line.match(/^(物业\s*地址|物业地址|地址)\s*[::]?\s*(.{1,})$/);
+    if(propAddrMatch){
+      var val=propAddrMatch[2].trim();
+      /* 如果value是房号格式（X-Y或X-Y-Z或X号楼Y室），整行直接就是房号 */
+      if(/^\d+\s*[-\/／]\s*\d+/.test(val)||/^\d+栋\s*\d+/.test(val)||/^\d+幢\s*\d+/.test(val)){
+        outLines.push(val);
+        continue;
+      }
+      /* 否则保留原行（可能是真地址） */
+    }
+
+    outLines.push(line);
+  }
+  return outLines.join('\n');
 }
 
 /* 顺序邻近合并算法（v6.27 重写）
