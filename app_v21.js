@@ -849,6 +849,7 @@ function quickFollowupPrompt(id){
 
 /* ========== Client: Form ========== */
 function openClientForm(id){
+  try{
   S.editClientId=id||null;S.editTags=[];S.editPhones=[];S.editAreas=[];
   document.getElementById('clientFormTitle').textContent=id?'编辑客户':'新增客户';
   document.getElementById('cfId').value=id||'';
@@ -872,6 +873,10 @@ function openClientForm(id){
   renderPhoneList();renderTagChips();renderAreaCheckboxes();
   document.getElementById('clientFormModal').classList.add('show');
   var cfMb=document.querySelector('#clientFormModal .modal-body');if(cfMb)cfMb.scrollTop=0;
+  }catch(err){
+    console.error('[openClientForm]',err);
+    toast('打开客户表单失败: '+(err&&err.message||err),'error');
+  }
 }
 function renderPhoneList(){
   document.getElementById('cfPhoneList').innerHTML=S.editPhones.map(function(p,i){
@@ -3823,9 +3828,20 @@ function renderCommunityDetail(){
       renderCommunityList();
     };
   }
-  /* 编辑概况按钮 */
+  /* 编辑概况按钮（用 S.communityDetail 直接传值，避免闭包变量失效） */
   var editBtn2=document.getElementById('cmEditBtn');
-  if(editBtn2)editBtn2.onclick=function(){openCommunityForm(name)};
+  if(editBtn2){
+    editBtn2.onclick=function(){
+      try{
+        var n=S.communityDetail||name;
+        console.log('[cmEditBtn] openCommunityForm name=',n);
+        openCommunityForm(n);
+      }catch(err){
+        console.error('[cmEditBtn]',err);
+        toast('打开编辑失败: '+(err&&err.message||err),'error');
+      }
+    };
+  }
   /* 状态筛选按钮 */
   grid.querySelectorAll('[data-cmfilter]').forEach(function(btn){
     btn.onclick=function(){
@@ -3886,6 +3902,7 @@ function cmFilterBtn(key,label,count,current){
 
 /* 打开小区概况编辑表单 */
 function openCommunityForm(name){
+  try{
   var existing=S.properties.find(function(p){return p.type==='community'&&(p.title===name||p.community===name)});
   var c=existing||{type:'community',title:name,community:name};
   var html='<div class="modal-overlay show" id="communityFormModal">'
@@ -3991,6 +4008,10 @@ function openCommunityForm(name){
     renderCommunityList();
     toast('小区概况已保存','success');
   });
+  }catch(err){
+    console.error('[openCommunityForm]',err);
+    toast('打开小区概况编辑失败: '+(err&&err.message||err),'error');
+  }
 }
 
 /* 小区智能识别录入 */
@@ -4005,6 +4026,14 @@ function openCommunitySmartInput(){
     +'2. 键值对（小区名：XX 楼幢：12幢 房龄：2018年 ...）<br>'
     +'3. 自由文本（系统尝试自动识别关键字段）</div>'
     +'<textarea id="cmSmartArea" rows="10" style="width:100%;font-size:.8125rem;padding:8px;border:1px solid var(--border);border-radius:6px" placeholder="粘贴小区概况信息…"></textarea>'
+    +'<div class="smart-file-upload" style="margin-top:10px">'
+    +'<label class="sfu-btn" style="display:inline-flex;align-items:center;gap:4px;border:1px dashed var(--primary);background:var(--primary-light);color:var(--primary);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;font-weight:500">'
+    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+    +'上传文件识别'
+    +'<input type="file" id="cmSmartFileInput" accept=".xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg" style="display:none" multiple>'
+    +'</label>'
+    +'<span class="sfu-hint" id="cmSmartFileHint" style="margin-left:8px;font-size:.75rem;color:var(--text-muted)">支持 Excel/CSV 表格、文本文件、含文字截图照片</span>'
+    +'</div>'
     +'<div id="cmSmartPreview" style="margin-top:12px"></div>'
     +'</div>'
     +'<div class="modal-footer">'
@@ -4055,6 +4084,92 @@ function openCommunitySmartInput(){
     renderCommunityList();
     toast('已录入 '+parsedCommunities.length+' 个小区概况','success');
   });
+  /* 文件识别 — 复用 handleSmartFileUpload，但目标 textarea 是 cmSmartArea */
+  document.getElementById('cmSmartFileInput').addEventListener('change',function(e){
+    var files=Array.from(e.target.files||[]);
+    if(!files.length)return;
+    files.forEach(function(f){handleCommunitySmartFileUpload(f)});
+    e.target.value='';
+  });
+}
+
+/* 小区智能录入文件处理：解析后回填到 cmSmartArea */
+function handleCommunitySmartFileUpload(file){
+  var hintEl=document.getElementById('cmSmartFileHint');
+  var ta=document.getElementById('cmSmartArea');
+  if(!file||!ta)return;
+  var name=file.name.toLowerCase();
+  var ext=name.split('.').pop();
+  if(ext==='xlsx'||ext==='xls'){
+    hintEl.textContent='正在解析Excel文件...';hintEl.style.color='var(--warning)';
+    loadSheetJS().then(function(){
+      var reader=new FileReader();
+      reader.onload=function(e){
+        try{
+          var data=new Uint8Array(e.target.result);
+          var wb=XLSX.read(data,{type:'array'});
+          var sheets=wb.SheetNames;
+          var allText='';
+          for(var s=0;s<sheets.length;s++){
+            var ws=wb.Sheets[sheets[s]];
+            var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false,blankrows:false});
+            if(s>0)allText+='\n';
+            allText+='# sheet: '+sheets[s]+'\n';
+            var lines=[];
+            for(var r=0;r<rows.length;r++){
+              var row=rows[r]||[];
+              var cells=[];
+              for(var ci=0;ci<row.length;ci++){
+                var v=row[ci];
+                v=(v==null?'':String(v));
+                v=v.replace(/[\r\n\t]/g,'\u0001');
+                cells.push(v);
+              }
+              lines.push(cells.join('\t'));
+            }
+            allText+=lines.join('\n')+'\n';
+          }
+          ta.value=(ta.value?ta.value+'\n':'')+allText;
+          hintEl.textContent='Excel解析完成，共'+sheets.length+'个工作表，请点击「识别」';hintEl.style.color='var(--success)';
+        }catch(err){
+          hintEl.textContent='Excel解析失败：'+err.message;hintEl.style.color='var(--danger)';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }).catch(function(){
+      hintEl.textContent='Excel解析库加载失败，请重试或直接粘贴';hintEl.style.color='var(--danger)';
+    });
+  }else if(ext==='csv'||ext==='txt'){
+    hintEl.textContent='正在读取文件...';hintEl.style.color='var(--warning)';
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var text=e.target.result;
+      ta.value=(ta.value?ta.value+'\n':'')+text;
+      hintEl.textContent='文件读取完成，请点击「识别」';hintEl.style.color='var(--success)';
+    };
+    reader.readAsText(file);
+  }else if(ext==='png'||ext==='jpg'||ext==='jpeg'){
+    hintEl.textContent='首次加载OCR引擎约需10-30秒，请稍候...';hintEl.style.color='var(--warning)';
+    loadTesseract().then(function(worker){
+      hintEl.textContent='OCR引擎就绪，正在识别图片文字...';hintEl.style.color='var(--warning)';
+      worker.recognize(file).then(function(result){
+        var text=(result&&result.data&&result.data.text)||'';
+        text=text.replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+        if(text){
+          ta.value=(ta.value?ta.value+'\n':'')+text;
+          hintEl.textContent='✅ 图片识别完成（共'+text.length+'字），请点击「识别」';hintEl.style.color='var(--success)';
+        }else{
+          hintEl.textContent='⚠️ 图片识别完成但未提取到文字，可手动输入或重新拍照';hintEl.style.color='var(--warning)';
+        }
+      }).catch(function(err){
+        hintEl.textContent='图片识别失败：'+(err.message||err)+'。可手动输入或重试';hintEl.style.color='var(--danger)';
+      });
+    }).catch(function(err){
+      hintEl.textContent='OCR引擎加载失败：'+(err.message||err)+'，请手动输入或重试';hintEl.style.color='var(--danger)';
+    });
+  }else{
+    hintEl.textContent='不支持的文件格式，请上传Excel/CSV/TXT/PNG/JPG';hintEl.style.color='var(--danger)';
+  }
 }
 
 /* 解析小区智能录入 */
@@ -5321,6 +5436,7 @@ function renderTxList(){
   });
 }
 function openTxForm(id){
+  try{
   S.editTxId=id||null;
   document.getElementById('txFormTitle').textContent=id?'编辑成交记录':'录入成交记录';
   document.getElementById('txfId').value=id||'';
@@ -5359,6 +5475,10 @@ function openTxForm(id){
   };
   document.getElementById('txFormModal').classList.add('show');
   var tfMb=document.querySelector('#txFormModal .modal-body');if(tfMb)tfMb.scrollTop=0;
+  }catch(err){
+    console.error('[openTxForm]',err);
+    toast('打开成交表单失败: '+(err&&err.message||err),'error');
+  }
 }
 function saveTx(){
   var clientId=document.getElementById('txfClient').value;
