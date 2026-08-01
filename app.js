@@ -1031,7 +1031,98 @@ function parseSmartInput(text){
     }
   }
 
-  return results;
+  /* 顺序邻近合并：同一张卡片上的碎片（姓名行/电话行/等级行）合并为1个客户 */
+  return mergeSequentialClients(results);
+}
+
+/* 客户碎片顺序合并（与 mergeSequentialProps 同理）
+   核心规则：
+   - 两者都有姓名且不同 → 新客户
+   - 两者都有电话且不同 → 新客户（除非新碎片只有电话，作为第二电话合并）
+   - 否则 → 合并（补充字段） */
+function mergeSequentialClients(rawClients){
+  if(!rawClients||rawClients.length<=1)return rawClients||[];
+  var merged=[];
+  var current=null;
+  for(var i=0;i<rawClients.length;i++){
+    var c=rawClients[i];
+    if(current===null){
+      current=_cloneClient(c);
+      continue;
+    }
+    if(_shouldStartNewClient(current,c)){
+      merged.push(current);
+      current=_cloneClient(c);
+    }else{
+      _mergeClientFields(current,c);
+    }
+  }
+  if(current)merged.push(current);
+  return merged;
+}
+function _cloneClient(c){
+  return{
+    name:c.name||'',
+    phones:(c.phones||[]).map(function(p){return{label:p.label,number:p.number}}),
+    source:c.source||'',
+    grade:c.grade||'',
+    status:c.status||'',
+    budgetMin:c.budgetMin||0,
+    budgetMax:c.budgetMax||0,
+    areas:(c.areas||[]).slice(),
+    notes:c.notes||'',
+    wechat:c.wechat||'',
+    gender:c.gender||'未知',
+    tags:(c.tags||[]).slice()
+  };
+}
+function _shouldStartNewClient(current,c){
+  /* 两者都有姓名且不同 → 新客户 */
+  if(c.name&&current.name&&c.name!==current.name)return true;
+  /* 两者都有姓名且相同 → 重复，合并 */
+  if(c.name&&current.name&&c.name===current.name)return false;
+  /* 两者都有电话 */
+  var curPhones=current.phones.map(function(p){return p.number});
+  var cPhones=c.phones.map(function(p){return p.number});
+  var hasDifferentPhone=false;
+  for(var pi=0;pi<cPhones.length;pi++){
+    if(curPhones.indexOf(cPhones[pi])<0){hasDifferentPhone=true;break}
+  }
+  if(hasDifferentPhone){
+    /* 新碎片有姓名 → 新客户 */
+    if(c.name)return true;
+    /* 新碎片只有电话（无姓名/其他关键字段）→ 合并为第二电话 */
+    if(!c.source&&!c.grade&&!c.areas.length)return false;
+    /* 新碎片有其他字段 → 新客户 */
+    return true;
+  }
+  /* 默认：合并 */
+  return false;
+}
+function _mergeClientFields(target,source){
+  if(!target.name&&source.name)target.name=source.name;
+  if(!target.source&&source.source)target.source=source.source;
+  if(!target.grade&&source.grade)target.grade=source.grade;
+  if(!target.status&&source.status)target.status=source.status;
+  if(!target.budgetMin&&source.budgetMin)target.budgetMin=source.budgetMin;
+  if(!target.budgetMax&&source.budgetMax)target.budgetMax=source.budgetMax;
+  if(!target.wechat&&source.wechat)target.wechat=source.wechat;
+  if(target.gender==='未知'&&source.gender&&source.gender!=='未知')target.gender=source.gender;
+  if(!target.notes&&source.notes)target.notes=source.notes;
+  /* 合并电话（去重） */
+  for(var pi=0;pi<source.phones.length;pi++){
+    var pn=source.phones[pi].number;
+    var exists=target.phones.some(function(p){return p.number===pn});
+    if(!exists)target.phones.push({label:source.phones[pi].label,number:pn});
+  }
+  /* 合并区域（去重） */
+  for(var ai=0;ai<source.areas.length;ai++){
+    if(target.areas.indexOf(source.areas[ai])<0)target.areas.push(source.areas[ai]);
+  }
+  /* 合并标签（去重） */
+  for(var ti=0;ti<source.tags.length;ti++){
+    if(target.tags.indexOf(source.tags[ti])<0)target.tags.push(source.tags[ti]);
+  }
 }
 
 function isHeaderRow(fields){
