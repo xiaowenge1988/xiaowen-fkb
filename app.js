@@ -2369,7 +2369,20 @@ function assignPropField(prop,key,val){
       prop.businessDistrict=val;
       break;
     case'buildingAge':
-      prop.buildingAge=val;
+      /* 值校验：建成年代必须是合理年份格式，不能是房号/地址等。
+         合法的形式：4位数字年份(1900-2099)、"2018年"、"2018年建"、"约2018"等；
+         拒绝：含"-"的房号(16-1704)、纯数字范围、地址格式等 */
+      if(val){
+        var ageOk=false;
+        var yearMatch=val.match(/(\d{4})\s*年?建?/);
+        if(yearMatch){
+          var y=parseInt(yearMatch[1]);
+          if(y>=1900&&y<=2099)ageOk=true;
+        }
+        /* 也接受"约2018"、"2018年左右"等模糊表达 */
+        if(!ageOk&&/(\d{4})/.test(val)&&val.length<=15)ageOk=true;
+        if(ageOk)prop.buildingAge=val;
+      }
       break;
     case'propertyRights':
       prop.propertyRights=val;
@@ -2516,9 +2529,13 @@ function autoDetectPropFields(prop,fields,rawLine){
     }
 
     /* building age */
-    if(f.match(/\d{4}\s*年?建?/)||f.indexOf('年代')>=0||f.indexOf('建成')>=0){
+    var ageYearMatch=f.match(/(\d{4})\s*年?建?/);
+    if((ageYearMatch&&parseInt(ageYearMatch[1])>=1900&&parseInt(ageYearMatch[1])<=2099)||f.indexOf('年代')>=0||f.indexOf('建成')>=0){
       if(!allowKey('buildingAge'))continue;
-      prop.buildingAge=f;continue;
+      /* 排除房号/地址格式（如16-1704），只接受合理的年份格式 */
+      if(!/^\d+\s*[-—\/／]\s*\d+/.test(f)&&!/^\d+\s*[\/／]\s*\d+$/.test(f)){
+        prop.buildingAge=f;continue;
+      }
     }
 
     /* has key */
@@ -3424,12 +3441,12 @@ function renderCommunityList(){
       feeStr=info.propertyFees.map(function(f){return esc(f.type||'')+':'+esc(f.fee||'')}).join('，');
     }
     var hasOverview=!!c.info;
-    return'<div class="community-card" data-community="'+esc(name)+'" style="cursor:pointer">'
+    return'<div class="community-card" data-community="'+esc(name)+'" style="cursor:pointer;transition:all .2s;position:relative;overflow:hidden" onmouseenter="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 20px rgba(37,99,235,.12)\'" onmouseleave="this.style.transform=\'\';this.style.boxShadow=\'\'">'
       +'<div class="card-body" style="padding:16px">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
-      +'<div><div class="card-title" style="font-size:1rem;font-weight:600">'+esc(name)+'</div>'
+      +'<div style="flex:1;min-width:0"><div class="card-title" style="font-size:1.05rem;font-weight:600;display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'+esc(name)+'</div>'
       +'<div class="card-info"><span>'+esc(locStr||'未分类区域')+'</span></div></div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;margin-left:8px">'
       +(c.forSale?'<span class="status-badge" data-status="在售">在售 '+c.forSale+'</span>':'')
       +(c.forRent?'<span class="status-badge" data-status="在租">在租 '+c.forRent+'</span>':'')
       +(c.onHold?'<span class="status-badge" data-status="暂缓">暂缓 '+c.onHold+'</span>':'')
@@ -3440,7 +3457,10 @@ function renderCommunityList(){
       +(schoolStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">'+schoolStr+'</div>':'')
       +(feeStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">物业费：'+feeStr+'</div>':'')
       +(!hasOverview?'<div style="font-size:.75rem;color:var(--warning);margin-bottom:4px">未填写小区概况，点击进入可补充</div>':'')
-      +'<div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">共 '+c.total+' 套房源 · 点击查看详情</div>'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">'
+      +'<div style="font-size:.75rem;color:var(--text-muted)">共 <b style="color:var(--primary)">'+c.total+'</b> 套房源</div>'
+      +'<div style="font-size:.75rem;color:var(--primary);font-weight:500;display:flex;align-items:center;gap:2px">点击进入详情 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>'
+      +'</div>'
       +'</div></div>';
   }).join('');
   /* 绑定卡片点击事件 → 进入详情页 */
