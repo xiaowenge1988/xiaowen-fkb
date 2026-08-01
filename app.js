@@ -1523,7 +1523,7 @@ var OCR_NOISE_PATTERNS=[
   /^未到访$/, /^已到访$/, /^已参观$/, /^已带看$/,
   /^来源[：:]?$/, /^渠道[：:]?$/,
   /^业主电话[：:]?$/, /^业主[：:]?$/, /^业主姓名[：:]?$/, /^联系方式[：:]?$/,
-  /^联系电话[：:]?$/, /^小区[：:]?$/, /^地址[：:]?$/, /^面积[：:]?$/, /^楼层[：:]?$/, /^户型[：:]?$/,
+  /^联系电话[：:]?$/, /^小区[：:]?$/, /^物业地址[：:]?$/, /^地址[：:]?$/, /^面积[：:]?$/, /^楼层[：:]?$/, /^户型[：:]?$/,
   /^物业[：:]?$/, /^楼盘[：:]?$/, /^开发商[：:]?$/, /^单价[：:]?$/, /^总价[：:]?$/, /^均价[：:]?$/
 ];
 var OCR_NOISE_SUBSTR=['必填填写跟进后关机本','必填填写跟进','填写跟进后','电话查看','详情查看','必填填写','跟进后关机','时六知理员','名单来源','填写跟进','列表来源','理员','项源','查看更多','点击查看','点击详情','公盘电话','填写','跟进后','关机','公盘'];
@@ -1534,7 +1534,11 @@ function isOcrNoiseLine(line){
   if(t.length<2)return true;
   /* "楼号-房号"格式（如16-1704、3-501、5-2-301）不是噪声，是有效数据（必须优先于"纯数字"判断） */
   if(/^\d+\s*[\-－—\/／]\s*\d+/.test(t))return false;
-  /* 全是数字+标点（无中文/英文） → 噪声 */
+  /* 11位手机号不是噪声（重要：之前这里被误判为噪声，导致多张图的电话全丢） */
+  if(/^1[3-9]\d{9}$/.test(t))return false;
+  /* 11位手机号+分隔符+11位手机号（如"13867551300 / 13867497887"）也不是噪声 */
+  if(/^1[3-9]\d{9}[\s\/／,，]+1[3-9]\d{9}/.test(t))return false;
+  /* 纯数字+标点+无中文/英文 → 噪声（但已经排除上面的电话、房号格式） */
   if(/^[\d\s\-_,\.，。:：()（）\/\\]+$/.test(t)&&!/[\u4e00-\u9fa5a-zA-Z]/.test(t))return true;
   for(var i=0;i<OCR_NOISE_PATTERNS.length;i++){
     if(OCR_NOISE_PATTERNS[i].test(t))return true;
@@ -1612,117 +1616,138 @@ function preprocessOcrText(text){
   return cleanLines.join('\n');
 }
 
-/* 同一图片识别出的多条"碎片房源"按"小区+楼幢+房号"分组合并 */
-function mergeSmartPropsByKey(props){
-  var groups={};
-  /* 第一遍：严格按"小区+楼号+房号"分组 */
-  for(var i=0;i<props.length;i++){
-    var p=props[i];
-    var keyParts=[];
-    if(p.community)keyParts.push(p.community.replace(/\s+/g,'').toLowerCase());
-    if(p.building)keyParts.push('b'+p.building);
-    if(p.room)keyParts.push('r'+p.room);
-    if(p.floor)keyParts.push('f'+p.floor);
-    /* 没有小区名也没楼号 → 无法合并，单独保留 */
-    if(keyParts.length===0){
-      p._uniqId='_orphan_'+i;
+/* 顺序邻近合并算法（v6.27 重写）
+   核心原理：OCR 文本中，同一张图片/卡片的字段是连续的。
+   按顺序遍历所有碎片 prop，当遇到"新小区名"或"不同房号"时，
+   判定为新房源；否则将碎片合并到当前房源。
+   解决问题：多张卡片图被合并成1条 / 单张卡片碎片无法合并 */
+function mergeSequentialProps(rawProps){
+  if(!rawProps||rawProps.length===0)return[];
+  if(rawProps.length===1)return rawProps;
+  var merged=[];
+  var current=null;
+  for(var i=0;i<rawProps.length;i++){
+    var p=rawProps[i];
+    if(current===null){
+      current=_cloneProp(p);
       continue;
     }
-    var key=keyParts.join('|');
-    if(!groups[key]){
-      groups[key]=p;
-      p._uniqId=key;
+    if(_shouldStartNewProp(current,p)){
+      merged.push(current);
+      current=_cloneProp(p);
     }else{
-      var existing=groups[key];
-      /* 把新条目的非空字段合并到现有条目（不覆盖已有） */
-      for(var f in p){
-        if(f==='_uniqId'||f==='_duplicate'||f==='_duplicateId'||f==='_rawLine'||f==='type')continue;
-        if(p[f]!==undefined&&p[f]!==''&&p[f]!==0&&p[f]!==null){
-          if(existing[f]===undefined||existing[f]===''||existing[f]===0||existing[f]===null){
-            existing[f]=p[f];
-          }else if(typeof p[f]==='string'&&existing[f].indexOf(p[f])<0&&p[f].length>existing[f].length){
-            /* 字符串型字段：新值更长且不包含现有值时替换 */
-            existing[f]=p[f];
-          }
-        }
+      _mergeFields(current,p);
+    }
+  }
+  if(current)merged.push(current);
+  return merged;
+}
+function _cloneProp(p){
+  var c={};
+  for(var f in p){
+    if(f==='_uniqId'||f==='_duplicate'||f==='_duplicateId'||f==='_rawLine')continue;
+    c[f]=p[f];
+  }
+  return c;
+}
+function _countKeyFields(p){
+  var n=0;
+  if(p.community)n++;
+  if(p.building)n++;
+  if(p.room)n++;
+  if(p.ownerPhone)n++;
+  if(p.area)n++;
+  return n;
+}
+function _shouldStartNewProp(current,p){
+  /* 规则1：两者都有小区名 */
+  if(p.community&&current.community){
+    /* 完全相同（小区+楼号+房号）→ 重复，合并 */
+    if(p.community===current.community&&
+       p.building===current.building&&p.room===current.room)return false;
+    /* 不同小区名 → 新房源 */
+    if(p.community!==current.community)return true;
+    /* 同小区，但当前已完整（有楼号+房号）→ 新房源 */
+    if(current.building&&current.room)return true;
+    /* 同小区，当前不完整 → 合并（补充字段） */
+    return false;
+  }
+  /* 规则2：两者都有楼号+房号 */
+  if(p.building&&p.room&&current.building&&current.room){
+    /* 相同楼号+房号 → 合并（重复/互补） */
+    if(p.building===current.building&&p.room===current.room)return false;
+    /* 不同 → 新房源 */
+    return true;
+  }
+  /* 规则3：两者都有电话（不同号码） */
+  if(p.ownerPhone&&current.ownerPhone&&p.ownerPhone!==current.ownerPhone){
+    var pFieldCount=_countKeyFields(p);
+    /* p 只有电话（无其他关键字段）→ 合并为第二个电话 */
+    if(pFieldCount<=1)return false;
+    /* p 还有其他字段（小区/楼号）→ 新房源 */
+    return true;
+  }
+  /* 默认：合并（p 补充 current 缺失的字段） */
+  return false;
+}
+function _mergeFields(target,source){
+  for(var f in source){
+    if(f==='_uniqId'||f==='_duplicate'||f==='_duplicateId'||f==='_rawLine'||f==='type')continue;
+    if(source[f]!==undefined&&source[f]!==''&&source[f]!==0&&source[f]!==null){
+      if(target[f]===undefined||target[f]===''||target[f]===0||target[f]===null){
+        target[f]=source[f];
+      }else if(f==='ownerPhone'&&target[f]!==source[f]){
+        /* 多个电话：用分隔符连接 */
+        target[f]=target[f]+' / '+source[f];
       }
     }
   }
-  var result=Object.values(groups);
+}
 
-  /* 第二遍：智能借配 — 如果整批识别结果只有 1 个有小区名的"主组"，
-     把其他 orphan/楼号组都合并进去。
-     这是关键：OCR图片常把"小区名"和"楼号"识别在不同的行，
-     但它们其实属于同一套房。 */
-  var mainGroup=null;
-  var orphanOrBuildingOnly=[];
-  for(var ri=0;ri<result.length;ri++){
-    var item=result[ri];
-    if(item.community&&!item._uniqId.startsWith('_orphan_')){
-      if(!mainGroup)mainGroup=item;
-      else{
-        /* 多个有小区名的组，按小区名相似度比较，相似度高的合并到 mainGroup */
-        var isSimilar=item.community.replace(/\s+/g,'').toLowerCase()===
-                      mainGroup.community.replace(/\s+/g,'').toLowerCase();
-        /* OCR 错误可能把"柏悦"识别成"柏桕"，放宽相似度判断：编辑距离<=2 */
-        if(!isSimilar){
-          var a=item.community.replace(/\s+/g,'').toLowerCase();
-          var b=mainGroup.community.replace(/\s+/g,'').toLowerCase();
-          var dist=0;
-          if(Math.abs(a.length-b.length)<=2){
-            for(var di=0;di<Math.min(a.length,b.length);di++){
-              if(a[di]!==b[di])dist++;
-              if(dist>2)break;
-            }
-            isSimilar=dist<=2;
-          }
-        }
-        if(isSimilar){
-          /* 合并到 mainGroup（保留 mainGroup 的小区名） */
-          for(var mf in item){
-            if(mf==='_uniqId'||mf==='_duplicate'||mf==='_duplicateId'||mf==='type'||mf==='community')continue;
-            if(item[mf]!==undefined&&item[mf]!==''&&item[mf]!==0){
-              if(mainGroup[mf]===undefined||mainGroup[mf]===''||mainGroup[mf]===0){
-                mainGroup[mf]=item[mf];
-              }
-            }
-          }
-          result.splice(ri,1);ri--;
-        }
-      }
-    }else{
-      orphanOrBuildingOnly.push(item);
+/* 列表模式检测：识别"小区\t房号\t面积"的多行表格（如房号列表图）
+   用户场景：上传一张小区房号列表（每行一个房号+面积，没有电话），系统应该识别为多套独立房源，而不是合并成1条。
+   判定条件：
+   1. 至少 3 行"小区\t房号-房号\t面积"格式
+   2. 大多数行的小区名相同（>= 70%）
+   3. 行内含"楼号-房号"格式（如 16-1704、3-501）
+   返回 {isListMode, mainCommunity} 或 null */
+function detectListMode(cleanedText){
+  if(!cleanedText)return null;
+  var lines=cleanedText.split(/\n/).map(function(l){return l.trim()}).filter(Boolean);
+  if(lines.length<3)return null;
+  /* 1) 跳过表头行（首行可能含"小区名字/物业地址/面积"等表头） */
+  var startIdx=0;
+  if(/小区.*(地址|房号)|地址.*面积|小区名字/.test(lines[0]))startIdx=1;
+  var dataLines=lines.slice(startIdx);
+  if(dataLines.length<3)return null;
+  /* 2) 统计每行的"小区名"（第一列）和"是否有楼号-房号" */
+  var communityCount={};
+  var validRowCount=0;
+  for(var i=0;i<dataLines.length;i++){
+    var line=dataLines[i];
+    var fields=line.split(/[\t,，]/).map(function(f){return f.trim()}).filter(Boolean);
+    if(fields.length<2)continue;
+    /* 第1列是小区名（2-15个中文字符） */
+    var cn=fields[0];
+    if(cn.length<2||cn.length>20||!/[\u4e00-\u9fa5]/.test(cn))continue;
+    /* 后面某列含"楼号-房号"格式 */
+    var hasRoom=false;
+    for(var j=1;j<fields.length;j++){
+      if(/\d+\s*[\-－—\/／]\s*\d{2,5}/.test(fields[j])){hasRoom=true;break}
     }
+    if(!hasRoom)continue;
+    communityCount[cn]=(communityCount[cn]||0)+1;
+    validRowCount++;
   }
-  /* 如果有主组，把 orphan 和楼号组都合并进去（图片OCR里这些字段都属于同一套房） */
-  if(mainGroup){
-    for(var oi=0;oi<orphanOrBuildingOnly.length;oi++){
-      var orphan=orphanOrBuildingOnly[oi];
-      for(var of in orphan){
-        if(of==='_uniqId'||of==='_duplicate'||of==='_duplicateId'||of==='type'||of==='community')continue;
-        if(orphan[of]!==undefined&&orphan[of]!==''&&orphan[of]!==0){
-          if(mainGroup[of]===undefined||mainGroup[of]===''||mainGroup[of]===0){
-            mainGroup[of]=orphan[of];
-          }
-        }
-      }
-    }
-    /* 清理结果列表，只保留 mainGroup */
-    var filtered=[];
-    for(var fi=0;fi<result.length;fi++){
-      if(result[fi].community&&!result[fi]._uniqId.startsWith('_orphan_')){
-        /* 相似合并过的也跳过 */
-        var isMergedSimilar=false;
-        for(var fj=0;fj<result.length;fj++){
-          if(fj!==fi&&result[fj]===mainGroup)continue;
-        }
-        if(result[fi]!==mainGroup)continue;  /* 跳过被合并的 */
-      }
-      if(result[fi]===mainGroup)filtered.push(result[fi]);
-    }
-    result=filtered;
+  if(validRowCount<3)return null;
+  /* 3) 找出现频率最高的小区名（>=70%且>=3次） */
+  var mainCommunity='';
+  var maxCount=0;
+  for(var k in communityCount){
+    if(communityCount[k]>maxCount){maxCount=communityCount[k];mainCommunity=k}
   }
-  return result;
+  if(!mainCommunity||maxCount<3||maxCount/validRowCount<0.7)return null;
+  return{isListMode:true,mainCommunity:mainCommunity,rowCount:validRowCount};
 }
 
 function parseSmartProp(text){
@@ -1731,6 +1756,10 @@ function parseSmartProp(text){
   /* 0) OCR文本预处理：清洗UI噪声词（电话查看、详情查看、必填填写跟进等） */
   var cleanedText=preprocessOcrText(text);
   if(!cleanedText.trim())return [];
+
+  /* 列表模式检测：识别"小区\t房号+面积"的多行表格（如绿荷的房号列表图）
+     这种结构每行是一个独立房源（无电话），不应该被合并 */
+  var listModeInfo=detectListMode(cleanedText);
 
   /* 1) 先检测是否是结构化表格（第一行是表头 + 后续有多行数据） */
   var rawLines=cleanedText.split(/\n/);
@@ -1759,6 +1788,13 @@ function parseSmartProp(text){
   var headers=null;
   var dataRowCount=0;
   var currentIsNewdev=(S&&S.subtab==='newdev')||false;
+
+  /* 关键检测：列表模式（"小区\t房号\t面积"的多行表格，每行一个房源，无电话）
+     用户的图3就是这种结构：14行房号+面积，没有电话。
+     之前的版本会被合并成1条（"智能借配"把所有行合并到mainGroup）。
+     新策略：当识别到"小区\t房号+面积"的多行结构时，每行直接生成独立 prop，不走合并 */
+  var isListMode=listModeInfo&&listModeInfo.isListMode;
+  var listModeMainCommunity=listModeInfo?listModeInfo.mainCommunity:'';
 
   for(var i=0;i<lines.length;i++){
     var line=lines[i].trim();
@@ -1858,6 +1894,12 @@ function parseSmartProp(text){
     /* OCR 图片里识别出大量碎片信息（小区名、楼号、电话散落在多行），
        不管这一行识别出了多少字段，都放到中间数组，最后按"小区+楼幢+房号+电话"分组合并 */
     if(prop.title||prop.ownerPhone||prop.community||prop.building||prop.room||prop.area){
+      /* 列表模式：补上小区名（识别时可能漏掉），并强制每行一条独立 prop（不参与合并） */
+      if(isListMode){
+        if(!prop.community&&listModeMainCommunity)prop.community=listModeMainCommunity;
+        if(!prop.title&&prop.community)prop.title=prop.community+(prop.area?prop.area+'㎡':'');
+        prop._isListRow=true;
+      }
       /* 检查与已有楼盘按 title 去重（忽略大小写、空格） */
       var normalizedTitle=(prop.title||prop.community||'').replace(/\s+/g,'').toLowerCase();
       if(normalizedTitle){
@@ -1875,8 +1917,13 @@ function parseSmartProp(text){
     }
   }
 
-  /* 关键步骤：同一图片内的多条碎片信息按"小区+楼幢+房号"分组合并 */
-  results=mergeSmartPropsByKey(rawProps);
+  /* 列表模式：每行直接是一条独立房源（不走合并） */
+  if(isListMode){
+    results=rawProps.slice();
+  }else{
+    /* 关键步骤：顺序邻近合并 — 同一张卡片内的碎片合并为1条，不同卡片独立保留 */
+    results=mergeSequentialProps(rawProps);
+  }
 
   /* title 字段缺失时尝试用合并后的 community 补上 */
   for(var ri=0;ri<results.length;ri++){
