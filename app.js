@@ -3407,7 +3407,99 @@ function renderCommunityList(){
   var table=document.getElementById('propertyTable');
   if(grid)grid.style.display='';
   if(table)table.style.display='none';
-  document.getElementById('propResultCount').innerHTML='共 <b>'+names.length+'</b> 个小区';
+
+  /* ========== 应用筛选 ========== */
+  var cf=S.communityFilters||(S.communityFilters={district:'',status:'',keyword:'',sort:'updatedAt'});
+  var allNames=names.slice();
+  /* 提取所有区域+板块供下拉 */
+  var districtSet={};
+  allNames.forEach(function(n){
+    var d=(communityMap[n].info&&communityMap[n].info.district)||communityMap[n].district||'';
+    if(d)districtSet[d]=1;
+  });
+  var districts=Object.keys(districtSet).sort();
+  /* 应用区域筛选 */
+  var filteredNames=allNames.filter(function(n){
+    var d=(communityMap[n].info&&communityMap[n].info.district)||communityMap[n].district||'';
+    if(cf.district&&d!==cf.district)return false;
+    /* 应用状态筛选（小区内至少有一套该状态房源） */
+    if(cf.status){
+      var c=communityMap[n];
+      if(cf.status==='onSale'&&!c.forSale)return false;
+      if(cf.status==='onRent'&&!c.forRent)return false;
+      if(cf.status==='onHold'&&!c.onHold)return false;
+      if(cf.status==='sold'&&!c.sold)return false;
+      if(cf.status==='rented'&&!c.rented)return false;
+    }
+    /* 应用关键字搜索 */
+    if(cf.keyword){
+      var k=cf.keyword.toLowerCase();
+      var hay=n.toLowerCase();
+      if(hay.indexOf(k)<0){
+        var info=communityMap[n].info;
+        if(!info)return false;
+        var addstr=(info.street||'')+(info.neighborhood||'')+(info.address||'');
+        if(addstr.toLowerCase().indexOf(k)<0)return false;
+      }
+    }
+    return true;
+  });
+  /* 排序 */
+  filteredNames.sort(function(a,b){
+    if(cf.sort==='name')return a.localeCompare(b,'zh-CN');
+    if(cf.sort==='props')return (communityMap[b].total||0)-(communityMap[a].total||0);
+    /* 默认按最新房源更新时间 */
+    var latestB=S.properties.filter(function(p){return(p.type==='secondhand'||p.type==='rental')&&(p.community||'')===b}).reduce(function(m,p){return Math.max(m,p.updatedAt||0)},0);
+    var latestA=S.properties.filter(function(p){return(p.type==='secondhand'||p.type==='rental')&&(p.community||'')===a}).reduce(function(m,p){return Math.max(m,p.updatedAt||0)},0);
+    return latestB-latestA;
+  });
+  names=filteredNames;
+
+  /* ========== 渲染筛选栏 ========== */
+  var filterBar='<div class="filter-bar" style="margin-bottom:12px">'
+    +'<div class="filter-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div class="filter-group" style="display:flex;align-items:center;gap:4px"><label style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">区域</label>'
+    +'<select id="cmFilterDistrict" style="height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:.8125rem;background:#fff"><option value="">全部</option>'
+    +districts.map(function(d){return'<option value="'+esc(d)+'"'+(cf.district===d?' selected':'')+'>'+esc(d)+'</option>'}).join('')
+    +'</select></div>'
+    +'<div class="filter-group" style="display:flex;align-items:center;gap:4px"><label style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">含房源</label>'
+    +'<select id="cmFilterStatus" style="height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:.8125rem;background:#fff">'
+    +'<option value="">全部</option>'
+    +'<option value="onSale"'+(cf.status==='onSale'?' selected':'')+'>含在售</option>'
+    +'<option value="onRent"'+(cf.status==='onRent'?' selected':'')+'>含在租</option>'
+    +'<option value="onHold"'+(cf.status==='onHold'?' selected':'')+'>含暂缓</option>'
+    +'<option value="sold"'+(cf.status==='sold'?' selected':'')+'>含已售</option>'
+    +'<option value="rented"'+(cf.status==='rented'?' selected':'')+'>含已租</option>'
+    +'</select></div>'
+    +'<div class="filter-group" style="display:flex;align-items:center;gap:4px;flex:1;min-width:160px"><label style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">搜索</label>'
+    +'<input id="cmFilterKeyword" type="text" placeholder="小区名/街道/社区" value="'+esc(cf.keyword||'')+'" style="height:32px;padding:0 10px;border:1px solid var(--border);border-radius:6px;font-size:.8125rem;width:100%;outline:none">'
+    +'</div>'
+    +'<div class="filter-group" style="display:flex;align-items:center;gap:4px"><label style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">排序</label>'
+    +'<select id="cmFilterSort" style="height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-size:.8125rem;background:#fff">'
+    +'<option value="updatedAt"'+(cf.sort==='updatedAt'?' selected':'')+'>最近更新</option>'
+    +'<option value="name"'+(cf.sort==='name'?' selected':'')+'>小区名</option>'
+    +'<option value="props"'+(cf.sort==='props'?' selected':'')+'>房源数</option>'
+    +'</select></div>'
+    +(cf.district||cf.status||cf.keyword?'<button id="cmFilterReset" style="height:32px;padding:0 10px;border:1px solid var(--border);background:#fff;border-radius:6px;font-size:.75rem;cursor:pointer;color:var(--text-secondary)">重置</button>':'')
+    +'</div></div>';
+
+  document.getElementById('propResultCount').innerHTML=filterBar
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:0 4px"><div style="font-size:.875rem;color:var(--text-secondary)">共 <b style="color:var(--primary);font-size:1rem">'+names.length+'</b> 个小区'+(names.length!==allNames.length?' <span style="font-size:.75rem;color:var(--text-muted)">/ 全部 '+allNames.length+' 个</span>':'')+'</div></div>';
+
+  /* 绑定筛选事件 */
+  var distEl=document.getElementById('cmFilterDistrict');
+  var stEl=document.getElementById('cmFilterStatus');
+  var kwEl=document.getElementById('cmFilterKeyword');
+  var sortEl=document.getElementById('cmFilterSort');
+  var resetEl=document.getElementById('cmFilterReset');
+  if(distEl)distEl.addEventListener('change',function(){S.communityFilters.district=this.value;renderCommunityList()});
+  if(stEl)stEl.addEventListener('change',function(){S.communityFilters.status=this.value;renderCommunityList()});
+  if(sortEl)sortEl.addEventListener('change',function(){S.communityFilters.sort=this.value;renderCommunityList()});
+  if(kwEl){
+    var kt;kwEl.addEventListener('input',function(){clearTimeout(kt);var v=this.value;kt=setTimeout(function(){S.communityFilters.keyword=v;renderCommunityList()},250)});
+  }
+  if(resetEl)resetEl.addEventListener('click',function(){S.communityFilters={district:'',status:'',keyword:'',sort:'updatedAt'};renderCommunityList()});
+
   if(names.length===0){
     grid.innerHTML='<div class="empty" style="grid-column:1/-1"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><h3>还没有小区档案</h3><p>在二手房或租赁房中录入房源后，小区会自动出现在这里。也可点击「新增小区」手动添加小区概况。</p></div>';
     return;
@@ -3543,30 +3635,77 @@ function renderCommunityDetail(){
   var hasOverview=!!info.id;
 
   var html='<div style="margin-bottom:16px">'
-    /* 返回按钮 + 小区名 */
-    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
-    +'<button id="cmBackBtn" style="border:1px solid var(--border);background:var(--bg-secondary);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;display:flex;align-items:center;gap:4px">'
-    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>返回小区列表</button>'
-    +'<div style="flex:1"><div style="font-size:1.125rem;font-weight:600">'+esc(name)+'</div>'
-    +'<div style="font-size:.75rem;color:var(--text-muted)">'+esc(locStr||'未分类区域')+'</div></div>'
-    +'<button id="cmEditBtn" style="border:1px solid var(--border);background:var(--bg-secondary);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer">'+(hasOverview?'编辑概况':'添加概况')+'</button>'
-    +'</div>'
-    /* 概况信息 */
-    +(overviewItems.length||schoolStr||feeStr?
-      '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-bottom:12px">'
-      +(overviewItems.length?'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px;font-size:.8125rem;color:var(--text-secondary)">'+overviewItems.map(function(s){return'<span>'+s+'</span>'}).join('')+'</div>':'')
-      +(schoolStr?'<div style="font-size:.75rem;color:var(--text-secondary);margin-bottom:4px">'+schoolStr+'</div>':'')
-      +(feeStr?'<div style="font-size:.75rem;color:var(--text-secondary)">物业费：'+feeStr+'</div>':'')
-      +'</div>'
-      :'<div style="background:var(--warning-light);border-radius:8px;padding:12px;margin-bottom:12px;font-size:.8125rem;color:var(--warning)">该小区还没有概况信息，点击右上角"添加概况"补充</div>')
-    /* 状态筛选按钮 */
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+    /* 返回按钮 + 小区名 + 操作按钮 */
+    +'<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:14px 16px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:10px;color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.15)">'
+    +'<button id="cmBackBtn" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;display:flex;align-items:center;gap:4px;color:#fff;backdrop-filter:blur(8px)">'
+    +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>返回</button>'
+    +'<div style="flex:1;min-width:0"><div style="font-size:1.125rem;font-weight:600;display:flex;align-items:center;gap:6px">'
+    +'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
+    +esc(name)+'</div>'
+    +'<div style="font-size:.75rem;opacity:.85;margin-top:2px">'+esc(locStr||'未分类区域')+'</div></div>'
+    +'<button id="cmEditBtn" style="border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);padding:6px 12px;border-radius:6px;font-size:.8125rem;cursor:pointer;color:#fff;backdrop-filter:blur(8px)">'+(hasOverview?'编辑概况':'添加概况')+'</button>'
+    +'</div>';
+
+  /* ========== 概况信息分组卡片 ========== */
+  if(hasOverview||overviewItems.length||schoolStr||feeStr){
+    var basicInfo=[];
+    if(info.buildingCount)basicInfo.push({label:'楼幢数',value:info.buildingCount,icon:''});
+    if(info.householdCount)basicInfo.push({label:'总户数',value:info.householdCount+' 户',icon:''});
+    if(info.buildingAge)basicInfo.push({label:'房龄',value:info.buildingAge,icon:''});
+    if(info.propertyManagement)basicInfo.push({label:'物业公司',value:info.propertyManagement,icon:''});
+    if(info.street)basicInfo.push({label:'所在街道',value:info.street,icon:''});
+    if(info.neighborhood)basicInfo.push({label:'所属社区',value:info.neighborhood,icon:''});
+
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">';
+    /* 基本信息卡片 */
+    if(basicInfo.length){
+      html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">'
+        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:var(--primary-light);color:var(--primary);font-size:.75rem">ℹ</span>'
+        +'<span style="font-size:.875rem;font-weight:600;color:var(--text-primary)">基本信息</span></div>'
+        +'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">'
+        +basicInfo.map(function(it){return'<div><div style="font-size:.6875rem;color:var(--text-muted);margin-bottom:2px">'+esc(it.label)+'</div><div style="font-size:.8125rem;font-weight:500;color:var(--text-primary)">'+esc(it.value)+'</div></div>'}).join('')
+        +'</div></div>';
+    }
+    /* 教育配套卡片 */
+    if(schoolStr){
+      var schoolItems=[];
+      if(info.kindergarten)schoolItems.push({label:'幼儿园',value:info.kindergarten,icon:''});
+      if(info.primarySchool)schoolItems.push({label:'小学',value:info.primarySchool,icon:''});
+      if(info.middleSchool)schoolItems.push({label:'中学',value:info.middleSchool,icon:''});
+      html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">'
+        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:#fef3c7;color:#d97706;font-size:.75rem">🎓</span>'
+        +'<span style="font-size:.875rem;font-weight:600;color:var(--text-primary)">教育配套</span></div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px">'
+        +schoolItems.map(function(it){return'<div><div style="font-size:.6875rem;color:var(--text-muted);margin-bottom:2px">'+esc(it.label)+'</div><div style="font-size:.8125rem;font-weight:500;color:var(--text-primary)">'+esc(it.value)+'</div></div>'}).join('')
+        +'</div></div>';
+    }
+    /* 物业费卡片 */
+    if(feeStr){
+      html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+        +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-light)">'
+        +'<span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:#d1fae5;color:#059669;font-size:.75rem">💰</span>'
+        +'<span style="font-size:.875rem;font-weight:600;color:var(--text-primary)">物业费</span></div>'
+        +'<div style="font-size:.8125rem;color:var(--text-primary)">'+feeStr+'</div></div>';
+    }
+    html+='</div>';
+  }else{
+    html+='<div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:10px;padding:16px 18px;margin-bottom:12px;font-size:.875rem;color:#92400e;display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:1.25rem">⚠</span>'
+      +'<span>该小区还没有概况信息，点击右上角"添加概况"补充楼幢、户数、物业等基础信息</span></div>';
+  }
+
+  /* 状态筛选按钮 */
+  html+='<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.04)">'
+    +'<span style="font-size:.75rem;color:var(--text-muted);font-weight:500">房源状态：</span>'
     +cmFilterBtn('all','全部',stats.all,sf)
     +cmFilterBtn('onSale','在售',stats.onSale,sf)
     +cmFilterBtn('onRent','在租',stats.onRent,sf)
     +cmFilterBtn('onHold','暂缓',stats.onHold,sf)
     +cmFilterBtn('sold','已售',stats.sold,sf)
     +cmFilterBtn('rented','已租',stats.rented,sf)
+    +'<span style="margin-left:auto;font-size:.75rem;color:var(--text-muted)">共 '+stats.all+' 套</span>'
     +'</div>'
     +'</div>';
 
@@ -5351,6 +5490,162 @@ function clearAll(){
   });
 }
 
+/* ========== 智能搜索路由 ========== */
+function smartSearchRoute(q){
+  q=(q||'').trim();
+  if(!q){closeSearchSuggest();S.search='';if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList();if(S.tab==='transactions')renderTxList();return}
+  var ql=q.toLowerCase();
+  /* 在客户/房源/成交里都搜一遍 */
+  var clientHits=S.clients.filter(function(c){
+    var hay=((c.name||'')+' '+(c.phones||[]).join(' ')+' '+(c.tags||[]).join(' ')).toLowerCase();
+    return hay.indexOf(ql)>=0;
+  });
+  var propHits=S.properties.filter(function(p){
+    var hay=((p.title||'')+' '+(p.community||'')+' '+(p.developer||'')+' '+(p.building||'')+' '+(p.unit||'')+' '+(p.room||'')+' '+(p.ownerName||'')+' '+(p.ownerPhone||'')).toLowerCase();
+    return hay.indexOf(ql)>=0;
+  });
+  var txHits=S.transactions.filter(function(t){
+    var hay=((t.clientName||'')+' '+(t.propertyTitle||'')).toLowerCase();
+    return hay.indexOf(ql)>=0;
+  });
+  var total=clientHits.length+propHits.length+txHits.length;
+  if(total===0){
+    closeSearchSuggest();
+    /* 没命中时还是把搜索词填到S.search，方便用户清除 */
+    S.search=q;
+    if(S.tab==='clients')renderClientList();
+    else if(S.tab==='properties')renderPropertyList();
+    else if(S.tab==='transactions')renderTxList();
+    toast('未找到匹配"'+q+'"的内容','info');
+    return;
+  }
+  /* 单一类型有命中：自动跳转 */
+  var nonEmpty=[clientHits.length,propHits.length,txHits.length].filter(function(n){return n>0}).length;
+  if(nonEmpty===1){
+    if(clientHits.length>0){S.tab='clients';S.search=q;switchTab('clients');closeSearchSuggest();toast('已跳到客户管理，共'+clientHits.length+'位匹配客户','success');return}
+    if(propHits.length>0){
+      /* 房源命中：智能判断subtab（小区名→community, 房号→secondhand, 楼盘名→newdev） */
+      S.tab='properties';
+      var communityHit=propHits.find(function(p){return(p.community||'').toLowerCase().indexOf(ql)>=0&&p.type!=='community'});
+      var newdevHit=propHits.find(function(p){return p.type==='newdev'||(p.developer||'').toLowerCase().indexOf(ql)>=0});
+      var roomHit=propHits.find(function(p){return(p.building||'').toLowerCase().indexOf(ql)>=0||(p.room||'').toLowerCase().indexOf(ql)>=0});
+      if(newdevHit){S.subtab='newdev';S.propFilters={};S.search=q}
+      else if(roomHit&&roomHit.type==='rental'){S.subtab='rental';S.propFilters={};S.search=q}
+      else if(roomHit){S.subtab='secondhand';S.propFilters={};S.search=q}
+      else if(communityHit){S.subtab='secondhand';S.propFilters={community:communityHit.community};S.search=''}
+      else{S.subtab='secondhand';S.propFilters={};S.search=q}
+      switchTab('properties');switchSubtab(S.subtab);
+      closeSearchSuggest();
+      toast('已跳到'+({secondhand:'二手房',rental:'租赁房',newdev:'新楼盘'}[S.subtab]||'房源')+'，共'+propHits.length+'套匹配','success');
+      return;
+    }
+    if(txHits.length>0){S.tab='transactions';S.search=q;switchTab('transactions');closeSearchSuggest();toast('已跳到成交记录，共'+txHits.length+'条匹配','success');return}
+  }
+  /* 多类型都有命中：显示建议浮层 */
+  showSearchSuggest(q,clientHits,propHits,txHits);
+}
+
+function showSearchSuggest(q,clientHits,propHits,txHits){
+  closeSearchSuggest();
+  var el=document.createElement('div');
+  el.id='searchSuggestPanel';
+  el.style.cssText='position:fixed;top:64px;left:24px;width:420px;max-height:60vh;background:#fff;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.18);z-index:2000;overflow:hidden;animation:fadeIn .15s ease';
+  var html='<div style="padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-secondary);font-size:.8125rem;color:var(--text-secondary);display:flex;justify-content:space-between;align-items:center"><span>共 <b style="color:var(--primary)">'+(clientHits.length+propHits.length+txHits.length)+'</b> 条匹配 "<b>'+esc(q)+'</b>"</span><span style="cursor:pointer;color:var(--text-muted)" onclick="closeSearchSuggest()">✕</span></div>';
+  html+='<div style="max-height:50vh;overflow-y:auto">';
+  if(clientHits.length){
+    html+='<div style="padding:6px 14px;background:var(--bg-secondary);font-size:.6875rem;color:var(--text-muted);font-weight:600">👤 客户 ('+clientHits.length+')</div>';
+    clientHits.slice(0,5).forEach(function(c){
+      html+='<div class="sg-item" data-type="client" data-id="'+c.id+'" style="padding:10px 14px;border-bottom:1px solid var(--border-light);cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.875rem;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.name||'未命名')+'</div>'
+        +'<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">'+(c.phones&&c.phones[0]?'📞 '+esc(c.phones[0]):'')+' · '+esc(c.grade||'')+' · '+esc(c.status||'')+'</div></div>'
+        +'<span style="font-size:.75rem;color:var(--primary)">查看 →</span></div>';
+    });
+  }
+  if(propHits.length){
+    html+='<div style="padding:6px 14px;background:var(--bg-secondary);font-size:.6875rem;color:var(--text-muted);font-weight:600">🏠 房源 ('+propHits.length+')</div>';
+    propHits.slice(0,8).forEach(function(p){
+      var typeLabel={secondhand:'二手',rental:'租赁',newdev:'新盘',community:'小区'}[p.type]||'';
+      var title=p.title||p.community||p.developer||'未命名';
+      html+='<div class="sg-item" data-type="prop" data-id="'+p.id+'" style="padding:10px 14px;border-bottom:1px solid var(--border-light);cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.875rem;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(title)+'</div>'
+        +'<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px"><span style="display:inline-block;padding:1px 5px;background:var(--primary-light);color:var(--primary);border-radius:3px;font-size:.6875rem;margin-right:4px">'+typeLabel+'</span>'+esc(p.community||p.developer||'')+(p.building?(' · '+esc(p.building)):'')+(p.room?(' '+esc(p.room)):'')+'</div></div>'
+        +'<span style="font-size:.75rem;color:var(--primary)">查看 →</span></div>';
+    });
+  }
+  if(txHits.length){
+    html+='<div style="padding:6px 14px;background:var(--bg-secondary);font-size:.6875rem;color:var(--text-muted);font-weight:600">💰 成交 ('+txHits.length+')</div>';
+    txHits.slice(0,5).forEach(function(t){
+      html+='<div class="sg-item" data-type="tx" data-id="'+t.id+'" style="padding:10px 14px;border-bottom:1px solid var(--border-light);cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:.875rem;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.clientName||'')+' · '+esc(t.propertyTitle||'')+'</div>'
+        +'<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">'+esc(t.transactionDate||'')+' · '+esc(t.transactionType||'')+' · '+esc(t.totalPrice||'')+'</div></div>'
+        +'<span style="font-size:.75rem;color:var(--primary)">查看 →</span></div>';
+    });
+  }
+  html+='</div>';
+  el.innerHTML=html;
+  document.body.appendChild(el);
+  /* 点击外部关闭 */
+  setTimeout(function(){
+    document.addEventListener('click',function _close(e){
+      if(!el.contains(e.target)&&e.target.id!=='searchInput'&&e.target.id!=='searchInputMobile'){
+        closeSearchSuggest();
+        document.removeEventListener('click',_close);
+      }
+    });
+  },50);
+  /* 绑定建议项点击 */
+  el.querySelectorAll('.sg-item').forEach(function(item){
+    item.addEventListener('click',function(){
+      var type=item.getAttribute('data-type');
+      var id=item.getAttribute('data-id');
+      closeSearchSuggest();
+      if(type==='client'){S.tab='clients';S.search='';switchTab('clients');setTimeout(function(){showClientDetail(id)},100)}
+      else if(type==='prop'){S.tab='properties';S.search='';switchTab('properties');setTimeout(function(){showPropertyDetail(id)},100)}
+      else if(type==='tx'){S.tab='transactions';S.search='';switchTab('transactions');setTimeout(function(){showTxDetail(id)},100)}
+    });
+    item.addEventListener('mouseenter',function(){item.style.background='var(--bg-secondary)'});
+    item.addEventListener('mouseleave',function(){item.style.background=''});
+  });
+}
+
+function closeSearchSuggest(){
+  var el=document.getElementById('searchSuggestPanel');
+  if(el)el.remove();
+}
+
+function renderMobileSearchResults(q){
+  var ql=(q||'').trim().toLowerCase();
+  var c=document.getElementById('mobileSearchResults');
+  if(!c)return;
+  if(!ql){c.innerHTML='';return}
+  var hits=[];
+  S.clients.forEach(function(cl){
+    var hay=((cl.name||'')+' '+(cl.phones||[]).join(' ')).toLowerCase();
+    if(hay.indexOf(ql)>=0)hits.push({type:'client',icon:'',label:cl.name||'未命名',sub:(cl.phones&&cl.phones[0])||'',id:cl.id});
+  });
+  S.properties.forEach(function(p){
+    var hay=((p.title||'')+' '+(p.community||'')+' '+(p.developer||'')+' '+(p.building||'')+' '+(p.room||'')).toLowerCase();
+    if(hay.indexOf(ql)>=0)hits.push({type:'prop',icon:'',label:p.title||p.community||p.developer||'未命名',sub:({secondhand:'二手',rental:'租赁',newdev:'新盘'}[p.type]||'')+' · '+(p.community||p.developer||''),id:p.id});
+  });
+  if(hits.length===0){c.innerHTML='<div style="padding:40px 20px;text-align:center;color:var(--text-muted);font-size:.875rem">无匹配内容</div>';return}
+  c.innerHTML=hits.slice(0,30).map(function(h){
+    return'<div class="msr-item" data-type="'+h.type+'" data-id="'+h.id+'" style="padding:12px 16px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;cursor:pointer">'
+      +'<span style="font-size:1.25rem">'+h.icon+'</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:.875rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(h.label)+'</div>'
+      +'<div style="font-size:.75rem;color:var(--text-muted)">'+esc(h.sub)+'</div></div>'
+      +'<span style="color:var(--text-muted)">›</span></div>';
+  }).join('');
+  c.querySelectorAll('.msr-item').forEach(function(it){
+    it.addEventListener('click',function(){
+      var t=it.getAttribute('data-type');var id=it.getAttribute('data-id');
+      document.getElementById('mobileSearchOverlay').style.display='none';
+      document.getElementById('searchInputMobile').value='';
+      if(t==='client'){switchTab('clients');setTimeout(function(){showClientDetail(id)},100)}
+      else if(t==='prop'){switchTab('properties');setTimeout(function(){showPropertyDetail(id)},100)}
+    });
+  });
+}
+
 /* ========== Event Handlers ========== */
 function setupHandlers(){
   /* 安全绑定函数 — 元素不存在时跳过而非崩溃 */
@@ -5365,11 +5660,11 @@ function setupHandlers(){
     else{switchTab(tab)}
   })});
   document.querySelectorAll('.subtab').forEach(function(t){t.addEventListener('click',function(){switchSubtab(t.getAttribute('data-subtab'))})});
-  // Search - desktop
-  var st;document.getElementById('searchInput').addEventListener('input',function(){clearTimeout(st);var v=this.value;st=setTimeout(function(){S.search=v;if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList();if(S.tab==='transactions')renderTxList()},200)});
+  // Search - desktop (智能路由：自动识别客户名/电话/楼盘名/小区名/房号，跳转到对应tab)
+  var st;document.getElementById('searchInput').addEventListener('input',function(){clearTimeout(st);var v=this.value;st=setTimeout(function(){smartSearchRoute(v)},250)});
   // Search - mobile
   var stm;var searchInputMobile=document.getElementById('searchInputMobile');
-  if(searchInputMobile)searchInputMobile.addEventListener('input',function(){clearTimeout(stm);var v=this.value;stm=setTimeout(function(){S.search=v;if(S.tab==='clients')renderClientList();if(S.tab==='properties')renderPropertyList();if(S.tab==='transactions')renderTxList()},200)});
+  if(searchInputMobile)searchInputMobile.addEventListener('input',function(){clearTimeout(stm);var v=this.value;stm=setTimeout(function(){smartSearchRoute(v);if(document.getElementById('mobileSearchOverlay').style.display==='flex')renderMobileSearchResults(v)},250)});
   // Mobile search toggle
   var mobileSearchBtn=document.getElementById('mobileSearchBtn');
   if(mobileSearchBtn)mobileSearchBtn.addEventListener('click',function(){document.getElementById('mobileSearchOverlay').style.display='flex';document.getElementById('searchInputMobile').focus()});
