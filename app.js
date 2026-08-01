@@ -4569,12 +4569,19 @@ function openPropertyForm(id){
   document.getElementById('pfRentStatus').value=p.rentStatus||'空置待租';
   document.getElementById('pfMinLease').value=p.minLease||'';
   document.getElementById('pfMoveInDate').value=p.moveInDate||'';
-  document.getElementById('pfBuilding').value=p.building||'';
-  document.getElementById('pfUnit').value=p.unit||'';
-  document.getElementById('pfRoom').value=p.room||'';
+  /* 楼栋位置：解析 "5幢"/"2单元" → 数字 5/2 填入输入框 */
+  var bldNum=(p.building||'').match(/^\d+/);document.getElementById('pfBuilding').value=bldNum?bldNum[0]:'';
+  var unitNum=(p.unit||'').match(/^\d+/);document.getElementById('pfUnit').value=unitNum?unitNum[0]:'';
+  document.getElementById('pfRoom').value=(p.room||'').match(/^\d+/)?(p.room||'').match(/^\d+/)[0]:(p.room||'');
   document.getElementById('pfArea').value=p.area||'';
   document.getElementById('pfUnitPrice').value=p.unitPrice||'';
-  document.getElementById('pfLayout').value=p.layout||'';
+  /* 户型：解析 "3室2厅1卫" → 数字填入三个 input，同步到隐藏 pfLayout */
+  var layoutStr=p.layout||'';
+  var lrM=layoutStr.match(/(\d+)\s*室/);var lhM=layoutStr.match(/(\d+)\s*厅/);var lbM=layoutStr.match(/(\d+)\s*卫/);
+  document.getElementById('pfLayoutRoom').value=lrM?lrM[1]:'';
+  document.getElementById('pfLayoutHall').value=lhM?lhM[1]:'';
+  document.getElementById('pfLayoutBath').value=lbM?lbM[1]:'';
+  document.getElementById('pfLayout').value=layoutStr;
   document.getElementById('pfFloor').value=p.floor||'';
   document.getElementById('pfTotalFloors').value=p.totalFloors||'';
   document.getElementById('pfOrientation').value=p.orientation||'';
@@ -4719,9 +4726,17 @@ function saveProperty(){
   p.rentStatus=document.getElementById('pfRentStatus').value;
   p.minLease=document.getElementById('pfMinLease').value.trim();
   p.moveInDate=document.getElementById('pfMoveInDate').value.trim();
-  p.building=document.getElementById('pfBuilding').value.trim();
-  p.unit=document.getElementById('pfUnit').value.trim();
-  p.room=document.getElementById('pfRoom').value.trim();
+  var bldV=document.getElementById('pfBuilding').value.trim();
+  p.building=bldV?bldV+'幢':'';
+  var unitV=document.getElementById('pfUnit').value.trim();
+  p.unit=unitV?unitV+'单元':'';
+  var roomV=document.getElementById('pfRoom').value.trim();
+  p.room=roomV?roomV+'室':'';
+  /* 户型：把三个数字拼合成 "3室2厅1卫" 存到 p.layout */
+  var lrV=document.getElementById('pfLayoutRoom').value.trim();
+  var lhV=document.getElementById('pfLayoutHall').value.trim();
+  var lbV=document.getElementById('pfLayoutBath').value.trim();
+  p.layout=(lrV?lrV+'室':'')+(lhV?lhV+'厅':'')+(lbV?lbV+'卫':'');
   p.area=parseFloat(document.getElementById('pfArea').value)||0;
   p.unitPrice=p.area>0?Math.round(p.totalPrice*10000/p.area):0;
   p.layout=document.getElementById('pfLayout').value.trim();
