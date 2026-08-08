@@ -5,3 +5,10 @@ npm-debug.log*
 *.log
 /tmp/
 data/
+
+# 敏感 / 大文件：禁止提交
+.deploy/            # 含 SSH 私钥（已加密备份至腾讯文档，本地不入库）
+deploy.exp          # 含服务器密码的 expect 脚本
+*.traineddata       # OCR 语言模型（MB 级，非源码）
+icon_concepts/      # 含 AI 水印的概念图，非交付物
+
